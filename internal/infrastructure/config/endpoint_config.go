@@ -30,9 +30,6 @@ func GetEndpointEnv() []model.Endpoint {
 	if os.Getenv("X_APIGW_API_ID_SERVICE_00") !=  "" {
 		endpoint00.XApigwApiId = os.Getenv("X_APIGW_API_ID_SERVICE_00")
 	}
-	if os.Getenv("METHOD_SERVICE_00") !=  "" {
-		endpoint00.Method = os.Getenv("METHOD_SERVICE_00")
-	}
 	if os.Getenv("NAME_SERVICE_00") !=  "" {
 		endpoint00.Name = os.Getenv("NAME_SERVICE_00")
 	}
@@ -53,9 +50,6 @@ func GetEndpointEnv() []model.Endpoint {
 	}
 	if os.Getenv("X_APIGW_API_ID_SERVICE_01") !=  "" {
 		endpoint01.XApigwApiId = os.Getenv("X_APIGW_API_ID_SERVICE_01")
-	}
-	if os.Getenv("METHOD_SERVICE_01") !=  "" {
-		endpoint01.Method = os.Getenv("METHOD_SERVICE_01")
 	}
 	if os.Getenv("NAME_SERVICE_01") !=  "" {
 		endpoint01.Name = os.Getenv("NAME_SERVICE_01")
@@ -78,9 +72,6 @@ func GetEndpointEnv() []model.Endpoint {
 	if os.Getenv("X_APIGW_API_ID_SERVICE_02") !=  "" {
 		endpoint02.XApigwApiId = os.Getenv("X_APIGW_API_ID_SERVICE_02")
 	}
-	if os.Getenv("METHOD_SERVICE_02") !=  "" {
-		endpoint02.Method = os.Getenv("METHOD_SERVICE_02")
-	}
 	if os.Getenv("NAME_SERVICE_02") !=  "" {
 		endpoint02.Name = os.Getenv("NAME_SERVICE_02")
 	}
@@ -101,9 +92,6 @@ func GetEndpointEnv() []model.Endpoint {
 	}
 	if os.Getenv("X_APIGW_API_ID_SERVICE_03") !=  "" {
 		endpoint03.XApigwApiId = os.Getenv("X_APIGW_API_ID_SERVICE_03")
-	}
-	if os.Getenv("METHOD_SERVICE_03") !=  "" {
-		endpoint03.Method = os.Getenv("METHOD_SERVICE_03")
 	}
 	if os.Getenv("NAME_SERVICE_03") !=  "" {
 		endpoint03.Name = os.Getenv("NAME_SERVICE_03")

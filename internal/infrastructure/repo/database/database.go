@@ -138,6 +138,7 @@ func (w *WorkerRepository) GetPayment(	ctx context.Context,
 
 	// Query and Execute
 	query := `select cl.id,
+					cl.fk_order_id,
 					cl.transaction_id,
 					cl.type,
 					cl.status,
@@ -166,14 +167,13 @@ func (w *WorkerRepository) GetPayment(	ctx context.Context,
         return nil, errors.New(err.Error())
     }
 
-	resPayment := model.Payment{}
 	resOrder := model.Order{}
-
+	resPayment := model.Payment{Order: &resOrder}
 	var nullPaymentUpdatedAt sql.NullTime
-	//var nullOrderUpdatedAt sql.NullTime
 
 	for rows.Next() {
-		err := rows.Scan(	&resPayment.ID, 
+		err := rows.Scan(	&resPayment.ID,
+							&resPayment.Order.ID, 
 							&resPayment.Transaction,
 							&resPayment.Type,
 							&resPayment.Status,
@@ -181,14 +181,6 @@ func (w *WorkerRepository) GetPayment(	ctx context.Context,
 							&resPayment.Amount,
 							&resPayment.CreatedAt,
 							&nullPaymentUpdatedAt,
-
-					/*	&resOrder.ID, 
-							&resOrder.Status, 							
-							&resOrder.Currency, 
-							&resOrder.TotalAmount,
-							&resOrder.Address,
-							&resOrder.CreatedAt,
-							&nullOrderUpdatedAt,*/
 						)
 		if err != nil {
 			w.logger.Error().
@@ -202,21 +194,111 @@ func (w *WorkerRepository) GetPayment(	ctx context.Context,
     	} else {
 			resPayment.UpdatedAt = nil
 		}
-		/*if nullOrderUpdatedAt.Valid {
-        	resOrder.UpdatedAt = &nullOrderUpdatedAt.Time
-    	} else {
-			resOrder.UpdatedAt = nil
-		}*/
-
-		resPayment.Order = &resOrder
 	}
 
 	if resPayment == (model.Payment{}) {
 		w.logger.Warn().
 				Ctx(ctx).
-				Err(err).Send()
+				Err(erro.ErrNotFound).
+				Interface("payment.ID",payment.ID).Send()
 		return nil, erro.ErrNotFound
 	}
 		
 	return &resPayment, nil
+}
+
+// About get a payment from an order
+func (w *WorkerRepository) GetPaymentFromOrder(	ctx context.Context,
+												order *model.Order) (*[]model.Payment, error) {
+	// trace
+	ctx, span := tracerProvider.SpanCtx(ctx, "database.GetPaymentFromOrder")
+	defer span.End()
+
+	w.logger.Info().
+			Ctx(ctx).
+			Str("func","GetPaymentFromOrder").Send()
+
+	// db connection
+	conn, err := w.DatabasePG.Acquire(ctx)
+	if err != nil {
+		w.logger.Error().
+				Ctx(ctx).
+				Err(err).Send()
+		return nil, errors.New(err.Error())
+	}
+	defer w.DatabasePG.Release(conn)
+
+	// Query and Execute
+	query := `select cl.id,
+					cl.fk_order_id,
+					cl.transaction_id,
+					cl.type,
+					cl.status,
+					cl.currency,
+					cl.amount,										
+					cl.created_at,
+					cl.updated_at
+			from clearance cl
+				where cl.fk_order_id = $1`
+
+	rows, err := conn.Query(ctx, 
+							query, 
+							order.ID)
+	if err != nil {
+		w.logger.Error().
+				Ctx(ctx).
+				Err(err).Send()
+		return nil, errors.New(err.Error())
+	}
+	defer rows.Close()
+	
+    if err := rows.Err(); err != nil {
+		w.logger.Error().
+				Ctx(ctx).
+				Err(err).Msg("fatal error closing rows")
+        return nil, errors.New(err.Error())
+    }
+
+	resOrder := model.Order{}
+	resPayment := model.Payment{Order: &resOrder}
+	listPayment := []model.Payment{}
+
+	var nullPaymentUpdatedAt sql.NullTime
+
+	for rows.Next() {
+		err := rows.Scan(	&resPayment.ID,
+							&resOrder.ID, 
+							&resPayment.Transaction,
+							&resPayment.Type,
+							&resPayment.Status,
+							&resPayment.Currency,
+							&resPayment.Amount,
+							&resPayment.CreatedAt,
+							&nullPaymentUpdatedAt,
+						)
+		if err != nil {
+			w.logger.Error().
+					Ctx(ctx).
+					Err(err).Send()
+			return nil, errors.New(err.Error())
+        }
+
+		if nullPaymentUpdatedAt.Valid {
+        	resPayment.UpdatedAt = &nullPaymentUpdatedAt.Time
+    	} else {
+			resPayment.UpdatedAt = nil
+		}
+
+		listPayment = append(listPayment, resPayment)
+	}
+
+	/*if listPayment == ([]model.Payment{}) {
+		w.logger.Warn().
+				Ctx(ctx).
+				Err(erro.ErrNotFound).
+				Interface("Order.ID",Order.ID).Send()
+		return nil, erro.ErrNotFound
+	}*/
+		
+	return &listPayment, nil
 }

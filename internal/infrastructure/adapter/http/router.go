@@ -139,11 +139,11 @@ func (h *HttpRouters) Info(rw http.ResponseWriter, req *http.Request) {
 
 // About add payment
 func (h *HttpRouters) AddPayment(rw http.ResponseWriter, req *http.Request) error {
-	// extract context	
+	
+	// trace and log
 	ctx, cancel := context.WithTimeout(req.Context(), time.Duration(h.appServer.Server.CtxTimeout) * time.Second)
     defer cancel()
 
-	// trace	
 	ctx, span := tracerProvider.SpanCtx(ctx, "adapter.http.AddPayment")
 	defer span.End()
 	
@@ -151,8 +151,8 @@ func (h *HttpRouters) AddPayment(rw http.ResponseWriter, req *http.Request) erro
 			Ctx(ctx).
 			Str("func","AddPayment").Send()
 
+	// decode payload		
 	payment := model.Payment{}
-	
 	err := json.NewDecoder(req.Body).Decode(&payment)
     if err != nil {
 		trace_id := fmt.Sprintf("%v",ctx.Value("trace-request-id"))
@@ -171,19 +171,19 @@ func (h *HttpRouters) AddPayment(rw http.ResponseWriter, req *http.Request) erro
 
 // About get payment
 func (h *HttpRouters) GetPayment(rw http.ResponseWriter, req *http.Request) error {
-	// extract context		
+	
+	// trace and log
 	ctx, cancel := context.WithTimeout(req.Context(), time.Duration(h.appServer.Server.CtxTimeout) * time.Second)
     defer cancel()
 
-	// trace	
 	ctx, span := tracerProvider.SpanCtx(ctx, "adapter.http.GetPayment")
 	defer span.End()
 
-	// log with context
 	h.logger.Info().
 			Ctx(ctx).
 			Str("func","GetPayment").Send()
 
+	// decode payload			
 	vars := mux.Vars(req)
 	varID := vars["id"]
 
@@ -196,6 +196,41 @@ func (h *HttpRouters) GetPayment(rw http.ResponseWriter, req *http.Request) erro
 	payment := model.Payment{ID: varIDint}
 
 	res, err := h.workerService.GetPayment(ctx, &payment)
+	if err != nil {
+		trace_id := fmt.Sprintf("%v",ctx.Value("trace-request-id"))
+		return h.ErrorHandler(trace_id, err)
+	}
+	
+	return coreJson.WriteJSON(rw, http.StatusOK, res)
+}
+
+// About get payment from order
+func (h *HttpRouters) GetPaymentFromOrder(rw http.ResponseWriter, req *http.Request) error {
+	
+	// trace and log
+	ctx, cancel := context.WithTimeout(req.Context(), time.Duration(h.appServer.Server.CtxTimeout) * time.Second)
+    defer cancel()
+
+	ctx, span := tracerProvider.SpanCtx(ctx, "adapter.http.GetPaymentFromOrder")
+	defer span.End()
+
+	h.logger.Info().
+			Ctx(ctx).
+			Str("func","GetPaymentFromOrder").Send()
+
+	// decode payload			
+	vars := mux.Vars(req)
+	varID := vars["id"]
+
+	varIDint, err := strconv.Atoi(varID)
+    if err != nil {
+		trace_id := fmt.Sprintf("%v",ctx.Value("trace-request-id"))
+		return h.ErrorHandler(trace_id, erro.ErrBadRequest)
+    }
+
+	order := model.Order{ID: varIDint}
+
+	res, err := h.workerService.GetPaymentFromOrder(ctx, &order)
 	if err != nil {
 		trace_id := fmt.Sprintf("%v",ctx.Value("trace-request-id"))
 		return h.ErrorHandler(trace_id, err)

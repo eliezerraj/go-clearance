@@ -63,7 +63,5 @@ type Payment struct {
 }
 
 type Order struct {
-	ID				int	`json:"id,omitempty"`
-	CreatedAt		time.Time 	`json:"created_at,omitempty"`
-	UpdatedAt		*time.Time 	`json:"update_at,omitempty"`	
+	ID				int	`json:"id,omitempty"`	
 }

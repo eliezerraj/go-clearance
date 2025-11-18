@@ -76,9 +76,8 @@ func (s * WorkerService) HealthCheck(ctx context.Context) error {
 // About create a payment
 func (s *WorkerService) AddPayment(ctx context.Context, 
 									payment *model.Payment) (*model.Payment, error){
-	// trace
+	// trace and log
 	ctx, span := tracerProvider.SpanCtx(ctx, "service.AddPayment")
-	defer span.End()
 
 	s.logger.Info().
 			Ctx(ctx).
@@ -89,7 +88,6 @@ func (s *WorkerService) AddPayment(ctx context.Context,
 	if err != nil {
 		return nil, err
 	}
-	defer s.workerRepository.DatabasePG.ReleaseTx(conn)
 
 	// handle connection
 	defer func() {
@@ -98,6 +96,7 @@ func (s *WorkerService) AddPayment(ctx context.Context,
 		} else {
 			tx.Commit(ctx)
 		}
+		s.workerRepository.DatabasePG.ReleaseTx(conn)
 		span.End()
 	}()
 
@@ -117,7 +116,7 @@ func (s *WorkerService) AddPayment(ctx context.Context,
 // About get payment
 func (s * WorkerService) GetPayment(ctx context.Context, 
 									payment *model.Payment) (*model.Payment, error){
-	// trace
+	// trace and log
 	ctx, span := tracerProvider.SpanCtx(ctx, "service.GetPayment")
 	defer span.End()
 
@@ -125,7 +124,6 @@ func (s * WorkerService) GetPayment(ctx context.Context,
 			Ctx(ctx).
 			Str("func","GetPayment").Send()
 
-			
 	// Call a service
 	resCart, err := s.workerRepository.GetPayment(ctx, payment)
 	if err != nil {
@@ -133,4 +131,24 @@ func (s * WorkerService) GetPayment(ctx context.Context,
 	}
 								
 	return resCart, nil
+}
+
+// About get payment
+func (s * WorkerService) GetPaymentFromOrder(ctx context.Context, 
+											order *model.Order) (*[]model.Payment, error){
+	// trace and log
+	ctx, span := tracerProvider.SpanCtx(ctx, "service.GetPaymentFromOrder")
+	defer span.End()
+
+	s.logger.Info().
+			Ctx(ctx).
+			Str("func","GetPaymentFromOrder").Send()
+
+	// Call a service
+	resPayment, err := s.workerRepository.GetPaymentFromOrder(ctx, order)
+	if err != nil {
+		return nil, err
+	}
+								
+	return resPayment, nil
 }
