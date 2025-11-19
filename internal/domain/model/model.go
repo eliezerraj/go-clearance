@@ -2,16 +2,19 @@ package model
 
 import (
 	"time"
-	go_core_db_pg 		"github.com/eliezerraj/go-core/database/postgre"
-	go_core_otel_trace "github.com/eliezerraj/go-core/otel/trace"
+	go_core_db_pg 		"github.com/eliezerraj/go-core/v2/database/postgre"
+	go_core_otel_trace  "github.com/eliezerraj/go-core/v2/otel/trace"
+	go_core_event 		"github.com/eliezerraj/go-core/v2/event/kafka" 
 )
 
 type AppServer struct {
-	Application 	*Application	 				`json:"application"`
-	Server     		*Server     					`json:"server"`
-	EnvTrace		*go_core_otel_trace.EnvTrace	`json:"env_trace"`
-	DatabaseConfig	*go_core_db_pg.DatabaseConfig  	`json:"database_config"`
-	Endpoint 		*[]Endpoint						`json:"endpoints"`
+	Application 		*Application	 				`json:"application"`
+	Server     			*Server     					`json:"server"`
+	EnvTrace			*go_core_otel_trace.EnvTrace	`json:"env_trace"`
+	DatabaseConfig		*go_core_db_pg.DatabaseConfig  	`json:"database_config"`
+	KafkaConfigurations	*go_core_event.KafkaConfigurations  `json:"kafka_configurations"`
+	Topics 				[]string						`json:"topics"`
+	Endpoint 			*[]Endpoint						`json:"endpoints"`
 }
 
 type MessageRouter struct {
@@ -63,5 +66,12 @@ type Payment struct {
 }
 
 type Order struct {
-	ID				int	`json:"id,omitempty"`	
+	ID		int	`json:"id,omitempty"`	
+}
+
+type Event struct{
+	ID			string		`json:"event_id,omitempty"`
+	Type		string		`json:"event_type,omitempty"`
+	EventAt		time.Time 		`json:"event_date,omitempty"`
+	EventData	interface {}	`json:"event_data,omitempty"`
 }

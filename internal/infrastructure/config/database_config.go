@@ -6,7 +6,7 @@ import(
 
 	"github.com/joho/godotenv"
 	
-	go_core_db_pg "github.com/eliezerraj/go-core/database/postgre"
+	go_core_db_pg "github.com/eliezerraj/go-core/v2/database/postgre"
 )
 
 func GetDatabaseEnv() go_core_db_pg.DatabaseConfig {

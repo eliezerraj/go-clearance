@@ -12,13 +12,14 @@ import(
 	"github.com/go-clearance/shared/log"
 	"github.com/go-clearance/internal/domain/model"
 	"github.com/go-clearance/internal/infrastructure/adapter/http"
+	"github.com/go-clearance/internal/infrastructure/adapter/event"
 	"github.com/go-clearance/internal/infrastructure/server"
 	"github.com/go-clearance/internal/infrastructure/config"
 	"github.com/go-clearance/internal/infrastructure/repo/database"
 	"github.com/go-clearance/internal/domain/service"
 
-	go_core_otel_trace "github.com/eliezerraj/go-core/otel/trace"
-	go_core_db_pg "github.com/eliezerraj/go-core/database/postgre"
+	go_core_otel_trace 	"github.com/eliezerraj/go-core/v2/otel/trace"
+	go_core_db_pg 		"github.com/eliezerraj/go-core/v2/database/postgre"
 
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel"
@@ -90,11 +91,14 @@ func init(){
 	otelTrace 	:= config.GetOtelEnv()
 	databaseConfig := config.GetDatabaseEnv()
 	apiEndpoint := config.GetEndpointEnv() 
+	event, topics := config.GetEventKafkaEnv() 
 
 	appServer.Server = &server
 	appServer.EnvTrace = &otelTrace
 	appServer.DatabaseConfig = &databaseConfig 	
-	appServer.Endpoint = &apiEndpoint			
+	appServer.Endpoint = &apiEndpoint
+	appServer.KafkaConfigurations = &event
+	appServer.Topics = topics 
 }
 
 // About main
@@ -147,32 +151,24 @@ func main (){
 		break
 	}
 
-	// Cancel everything
-	defer func() {
-
-		if tracerProvider != nil {
-			err := tracerProvider.Shutdown(ctx)
-			if err != nil{
-				logger.Error().
-						Err(err).
-						Msg("Erro to shutdown tracer provider")
-			}
-		}
-		
-		appDatabasePGServer.CloseConnection()
-		cancel()
-
-		logger.Info().
-				Msgf("App %s Finalized SUCCESSFULL !!!", appServer.Application.Name)
-
-	}()
-
 	// wire
+	workerEvent, err := event.NewWorkerEventTX( ctx, 
+												appServer.Topics, 
+												appServer.KafkaConfigurations,
+												&appLogger)
+	if err != nil {
+		logger.Error().
+				Err(err).
+				Msg("Error create Kafka component ERROR")
+	}
+
+	_ = workerEvent
 	repository := database.NewWorkerRepository(&appDatabasePGServer,
 												&appLogger)
 	
 	workerService := service.NewWorkerService(&appServer,
-											 repository, 
+											 repository,
+											 workerEvent,
 											  &appLogger)
 
 	httpRouters := http.NewHttpRouters(&appServer,
@@ -186,11 +182,32 @@ func main (){
 	err = workerService.HealthCheck(ctx)
 	if err != nil {
 		logger.Error().
-					Err(err).Msg("Error health check support services ERROR")
+					Err(err).
+					Msg("Error health check support services ERROR")
 	} else {
 		logger.Info().
-					Msg("SERVICES HEALTH CHECK OK")
+				Msg("SERVICES HEALTH CHECK OK")
 	}
+
+	// Cancel everything
+	defer func() {
+		if tracerProvider != nil {
+			err := tracerProvider.Shutdown(ctx)
+			if err != nil{
+				logger.Error().
+						Err(err).
+						Msg("Erro to shutdown tracer provider")
+			}
+		}
+		workerEvent.Close(ctx)
+		appDatabasePGServer.CloseConnection()
+		
+		cancel()
+
+		logger.Info().
+				Msgf("App %s Finalized SUCCESSFULL !!!", appServer.Application.Name)
+
+	}()
 
 	// start http server
 	httpServer.StartHttpAppServer(ctx, 

@@ -6,7 +6,7 @@ import(
 	
 	"github.com/joho/godotenv"
 	
-	go_core_otel_trace "github.com/eliezerraj/go-core/otel/trace"
+	go_core_otel_trace "github.com/eliezerraj/go-core/v2/otel/trace"
 )
 
 func GetOtelEnv() go_core_otel_trace.EnvTrace {

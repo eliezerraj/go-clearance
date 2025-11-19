@@ -11,8 +11,8 @@ import (
 		"github.com/go-clearance/shared/erro"
 		"github.com/go-clearance/internal/domain/model"
 
-		go_core_otel_trace "github.com/eliezerraj/go-core/otel/trace"
-		go_core_db_pg "github.com/eliezerraj/go-core/database/postgre"
+		go_core_otel_trace "github.com/eliezerraj/go-core/v2/otel/trace"
+		go_core_db_pg "github.com/eliezerraj/go-core/v2/database/postgre"
 )
 
 var tracerProvider go_core_otel_trace.TracerProvider
@@ -169,6 +169,7 @@ func (w *WorkerRepository) GetPayment(	ctx context.Context,
 
 	resOrder := model.Order{}
 	resPayment := model.Payment{Order: &resOrder}
+
 	var nullPaymentUpdatedAt sql.NullTime
 
 	for rows.Next() {
@@ -196,7 +197,7 @@ func (w *WorkerRepository) GetPayment(	ctx context.Context,
 		}
 	}
 
-	if resPayment == (model.Payment{}) {
+	if resPayment.ID == 0 {
 		w.logger.Warn().
 				Ctx(ctx).
 				Err(erro.ErrNotFound).

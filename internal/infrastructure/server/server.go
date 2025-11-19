@@ -12,17 +12,13 @@ import(
 	"github.com/rs/zerolog"
 	"github.com/gorilla/mux"
 
-	go_core_midleware "github.com/eliezerraj/go-core/middleware"
+	go_core_midleware "github.com/eliezerraj/go-core/v2/middleware"
 
 	"github.com/go-clearance/internal/domain/model"
 	app_http_routers "github.com/go-clearance/internal/infrastructure/adapter/http"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux"
-)
-
-var(
-	go_core_middleware go_core_midleware.ToolsMiddleware
 )
 
 type HttpAppServer struct {
@@ -53,7 +49,11 @@ func (h *HttpAppServer) StartHttpAppServer(	ctx context.Context,
 			Str("func","StartHttpAppServer").Send()
 
 	appRouter := mux.NewRouter().StrictSlash(true)
-	appRouter.Use(go_core_middleware.MiddleWareHandlerHeader)
+
+	// creata a middleware component
+	appMiddleWare := go_core_midleware.NewMiddleWare(h.logger)										
+					
+	appRouter.Use(appMiddleWare.MiddleWareHandlerHeader)
 
 	appRouter.Handle("/metrics", promhttp.Handler())
 
@@ -74,15 +74,15 @@ func (h *HttpAppServer) StartHttpAppServer(	ctx context.Context,
 	info.Use(otelmux.Middleware(h.appServer.Application.Name))
 
 	add := appRouter.Methods(http.MethodPost, http.MethodOptions).Subrouter()
-	add.HandleFunc("/payment", go_core_middleware.MiddleWareErrorHandler(appHttpRouters.AddPayment))		
+	add.HandleFunc("/payment", appMiddleWare.MiddleWareErrorHandler(appHttpRouters.AddPayment))		
 	add.Use(otelmux.Middleware(h.appServer.Application.Name))
 
 	get := appRouter.Methods(http.MethodGet, http.MethodOptions).Subrouter()
-	get.HandleFunc("/payment/{id}",go_core_middleware.MiddleWareErrorHandler(appHttpRouters.GetPayment))		
+	get.HandleFunc("/payment/{id}",appMiddleWare.MiddleWareErrorHandler(appHttpRouters.GetPayment))		
 	get.Use(otelmux.Middleware(h.appServer.Application.Name))
 
 	getOrder := appRouter.Methods(http.MethodGet, http.MethodOptions).Subrouter()
-	getOrder.HandleFunc("/payment/order/{id}",go_core_middleware.MiddleWareErrorHandler(appHttpRouters.GetPaymentFromOrder))		
+	getOrder.HandleFunc("/payment/order/{id}",appMiddleWare.MiddleWareErrorHandler(appHttpRouters.GetPaymentFromOrder))		
 	getOrder.Use(otelmux.Middleware(h.appServer.Application.Name))
 
 	// -------   Server Http 
