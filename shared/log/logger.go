@@ -1,3 +1,6 @@
+//---------------------------------------
+// Component is charge of ingest data in log
+//---------------------------------------
 package log
 
 import(

@@ -42,6 +42,7 @@ func NewHttpAppServer(	appServer *model.AppServer,
 	}
 }
 
+// About start http server
 func (h *HttpAppServer) StartHttpAppServer(	ctx context.Context, 
 											appHttpRouters app_http_routers.HttpRouters,
 											) {
@@ -57,6 +58,7 @@ func (h *HttpAppServer) StartHttpAppServer(	ctx context.Context,
 
 	appRouter.Handle("/metrics", promhttp.Handler())
 
+	// setting routers
 	health := appRouter.Methods(http.MethodGet, http.MethodOptions).Subrouter()
     health.HandleFunc("/health", appHttpRouters.Health)
 
@@ -86,7 +88,6 @@ func (h *HttpAppServer) StartHttpAppServer(	ctx context.Context,
 	getOrder.Use(otelmux.Middleware(h.appServer.Application.Name))
 
 	// -------   Server Http 
-
 	srv := http.Server{
 		Addr:         ":" +  strconv.Itoa(h.appServer.Server.Port),      	
 		Handler:      appRouter,                	          
@@ -97,7 +98,8 @@ func (h *HttpAppServer) StartHttpAppServer(	ctx context.Context,
 
 	h.logger.Info().
 			Str("Service Port", strconv.Itoa(h.appServer.Server.Port)).Send()
-
+	
+	// start server
 	go func() {
 		err := srv.ListenAndServe()
 		if err != nil {
@@ -106,7 +108,7 @@ func (h *HttpAppServer) StartHttpAppServer(	ctx context.Context,
 		}
 	}()
 
-	// Get SIGNALS
+	// Get SIGNALS and handle shutdown
 	ch := make(chan os.Signal, 1)
 	signal.Notify(ch, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM)
 

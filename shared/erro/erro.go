@@ -1,3 +1,6 @@
+//---------------------------------------
+// Component is charge of defined message errors
+//---------------------------------------
 package erro
 
 import (

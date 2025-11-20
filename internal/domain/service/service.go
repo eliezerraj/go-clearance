@@ -73,13 +73,13 @@ func (s * WorkerService) HealthCheck(ctx context.Context) error {
 	err := s.workerRepository.DatabasePG.Ping()
 	if err != nil {
 		s.logger.Error().
-				Err(err).Msg("*** Database HEALTH FAILED ***")
+				Err(err).Msg("*** Database HEALTH CHECK FAILED ***")
 		return erro.ErrHealthCheck
 	}
 
 	s.logger.Info().
 			Str("func","HealthCheck").
-			Msg("*** Database HEALTH SUCCESSFULL ***")
+			Msg("*** Database HEALTH CHECK SUCCESSFULL ***")
 
 	return nil
 }
@@ -205,9 +205,8 @@ func(s *WorkerService) ProducerEventKafka(	ctx context.Context,
 	err = s.workerEvent.ProducerWorker.BeginTransaction()
 	if err != nil {
 		s.logger.Error().
-				Err(err).
-				Interface("trace-request-id", trace_id ).
-				Msg("failed to kafka BeginTransaction")
+				Ctx(ctx).
+				Err(err).Msg("failed to kafka BeginTransaction")
 
 		// Create a new producer and start a transaction
 		/*err = s.workerEvent.DestroyWorkerEventProducerTx(ctx)
@@ -254,36 +253,37 @@ func(s *WorkerService) ProducerEventKafka(	ctx context.Context,
 	//}
 	
 	if err != nil {
-		s.logger.Err(err).
-				Interface("trace-request-id", trace_id ).
-				Msg("KAFKA ROLLBACK !!!")
-		/*err_msk := s.workerEvent.WorkerKafka.AbortTransaction(ctx)
+		s.logger.Error().
+				Ctx(ctx).
+				Err(err).Msg("KAFKA ROLLBACK !!!")
+		err_msk := s.workerEvent.ProducerWorker.AbortTransaction(ctx)
 		if err_msk != nil {
-			childLogger.Err(err_msk).Interface("trace-request-id", trace_id ).Msg("failed to kafka AbortTransaction")
+			s.logger.Error().
+					Ctx(ctx).
+					Err(err).Msg("failed to kafka AbortTransaction")
 			return err_msk
-		}*/
+		}
 		return err
 	}
 
 	err = s.workerEvent.ProducerWorker.CommitTransaction(ctx)
 	if err != nil {
-		s.logger.Err(err).
-				Interface("trace-request-id", trace_id ).
-				Msg("Failed to Kafka CommitTransaction = KAFKA ROLLBACK COMMIT !!!")
+		s.logger.Error().
+				Ctx(ctx).
+				Err(err).Msg("Failed to Kafka CommitTransaction = KAFKA ROLLBACK COMMIT !!!")
 
 		errMskAbort := s.workerEvent.ProducerWorker.AbortTransaction(ctx)
 		if errMskAbort != nil {
-			s.logger.Err(errMskAbort).
-					Interface("trace-request-id", trace_id ).
-					Msg("failed to kafka AbortTransaction during CommitTransaction")
+			s.logger.Error().
+				Ctx(ctx).
+				Err(errMskAbort).Msg("failed to kafka AbortTransaction during CommitTransaction")
 			return errMskAbort
 		}
 		return err
 	}
 
 	s.logger.Info().
-			Interface("trace-request-id", trace_id ).
-			Msg("KAFKA COMMIT !!!")
+			Ctx(ctx).Msg("KAFKA SUCCESS COMMIT !!!")
 
     return 
 }

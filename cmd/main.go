@@ -27,6 +27,7 @@ import(
 	"go.opentelemetry.io/otel/propagation"
 )
 
+// Global variables
 var ( 
 	appLogger 	zerolog.Logger
 	logger		zerolog.Logger
@@ -104,10 +105,11 @@ func init(){
 // About main
 func main (){
 	logger.Info().
-			Str("func","main").Send()
+			Msgf("STARTING APP version: %s",appServer.Application.Version)
 	logger.Info().
 			Interface("appServer", appServer).Send()
 
+	// create context and otel log provider
 	ctx, cancel := context.WithCancel(context.Background())
 
 	var tracerProvider *sdktrace.TracerProvider
@@ -128,7 +130,7 @@ func main (){
 		tracer = tracerProvider.Tracer(appServer.Application.Name)
 	}
 
-	// Open Database
+	// Open prepare database
 	count := 1
 	var err error
 	for {
@@ -152,23 +154,25 @@ func main (){
 	}
 
 	// wire
-	workerEvent, err := event.NewWorkerEventTX( ctx, 
-												appServer.Topics, 
-												appServer.KafkaConfigurations,
-												&appLogger)
+	workerEventProducer, err := event.NewWorkerEventTX(ctx, 
+													   appServer.Topics, 
+													   appServer.KafkaConfigurations,
+													   &appLogger)
 	if err != nil {
 		logger.Error().
 				Err(err).
-				Msg("Error create Kafka component ERROR")
+				Msg("Error create Kafka Producer ERROR")
+	} else {
+		logger.Info().
+				Msg("KAFKA Producer SUCCESSFULL")
 	}
 
-	_ = workerEvent
 	repository := database.NewWorkerRepository(&appDatabasePGServer,
 												&appLogger)
 	
 	workerService := service.NewWorkerService(&appServer,
 											 repository,
-											 workerEvent,
+											 workerEventProducer,
 											  &appLogger)
 
 	httpRouters := http.NewHttpRouters(&appServer,
@@ -178,7 +182,7 @@ func main (){
 	httpServer := server.NewHttpAppServer(&appServer,
 										  &appLogger,)
 
-	// Health Check
+	// Services/dependevies health check
 	err = workerService.HealthCheck(ctx)
 	if err != nil {
 		logger.Error().
@@ -191,6 +195,7 @@ func main (){
 
 	// Cancel everything
 	defer func() {
+		// cancel log provider
 		if tracerProvider != nil {
 			err := tracerProvider.Shutdown(ctx)
 			if err != nil{
@@ -199,14 +204,18 @@ func main (){
 						Msg("Erro to shutdown tracer provider")
 			}
 		}
-		workerEvent.Close(ctx)
+
+		// cancel kafka
+		workerEventProducer.Close(ctx)
+		
+		// cancel database		
 		appDatabasePGServer.CloseConnection()
 		
+		// cancel context		
 		cancel()
 
 		logger.Info().
 				Msgf("App %s Finalized SUCCESSFULL !!!", appServer.Application.Name)
-
 	}()
 
 	// start http server
