@@ -66,12 +66,15 @@ type Payment struct {
 }
 
 type Order struct {
-	ID		int	`json:"id,omitempty"`	
+	ID			int		`json:"id,omitempty"`
+	Type		string 	`json:"type,omitempty"`
+	Status		string 	`json:"status,omitempty"`
+	Currency	string 	`json:"currency,omitempty"`	
 }
 
 type Event struct{
-	ID			string		`json:"event_id,omitempty"`
-	Type		string		`json:"event_type,omitempty"`
-	EventAt		time.Time 		`json:"event_date,omitempty"`
-	EventData	interface {}	`json:"event_data,omitempty"`
+	ID			string		 `json:"event_id,omitempty"`
+	Type		string		 `json:"event_type,omitempty"`
+	EventAt		time.Time 	 `json:"event_date,omitempty"`
+	EventData	interface {} `json:"event_data,omitempty"`
 }
