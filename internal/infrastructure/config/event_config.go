@@ -39,6 +39,9 @@ func GetEventKafkaEnv() (go_core_event.KafkaConfigurations, []string) {
 	if os.Getenv("KAFKA_CLIENT_ID") !=  "" {
 		kafkaConfigurations.Clientid = os.Getenv("KAFKA_CLIENT_ID")
 	}
+	if os.Getenv("KAFKA_GROUP_ID") !=  "" {
+		kafkaConfigurations.Groupid = os.Getenv("KAFKA_GROUP_ID")
+	}
 	if os.Getenv("KAFKA_BROKER_1") !=  "" {
 		kafkaConfigurations.Brokers1 = os.Getenv("KAFKA_BROKER_1")
 	}

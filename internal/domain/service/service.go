@@ -20,7 +20,7 @@ import (
 	go_core_otel_trace 	"github.com/eliezerraj/go-core/v2/otel/trace"
 
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/propagation"
+	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 )
 
 var tracerProvider go_core_otel_trace.TracerProvider
@@ -122,10 +122,11 @@ func (s *WorkerService) AddPayment(ctx context.Context,
 	}
 	payment.ID = resPayment.ID
 
+	// emit a event
 	if s.workerEvent != nil {
 		event := model.Event{
-			ID: "teste",
-			Type: "teste-2",
+			ID: fmt.Sprintf("%v",payment.ID),
+			Type: "cleareance.order",
 			EventAt: now,
 			EventData: payment,
 		}
@@ -184,9 +185,9 @@ func (s * WorkerService) GetPaymentFromOrder(ctx context.Context,
 }
 
 // About producer a event in kafka
-func(s *WorkerService) ProducerEventKafka(	ctx context.Context,
-											key string, 
-											event *model.Event) (err error) {
+func(s *WorkerService) ProducerEventKafka(ctx context.Context,
+										  key string, 
+										  event *model.Event) (err error) {
 	// trace and log
 	ctx, span := tracerProvider.SpanCtx(ctx, "service.ProducerEventKafka")
 	defer span.End()
@@ -226,32 +227,26 @@ func(s *WorkerService) ProducerEventKafka(	ctx context.Context,
 	if err != nil {
 		return err
 	}
-		
+
 	// prepare header
-	carrier := propagation.MapCarrier{}
-	otel.GetTextMapPropagator().Inject(ctx, &carrier)
+	kafkaHeaders := []kafka.Header{}
+	appCarrier := go_core_otel_trace.KafkaHeaderCarrier{Headers: &kafkaHeaders}
+	otel.GetTextMapPropagator().Inject(ctx, appCarrier)
+	appCarrier.Set("trace-request-id", trace_id)
+
+	s.logger.Printf("=========================================================")
+    for _, h := range kafkaHeaders {
+        s.logger.Printf("Header: %s = %s\n", h.Key, string(h.Value))
+    }
+	s.logger.Printf("=========================================================")
 	
-	headers_msk := make(map[string]string)
-	for k, v := range carrier {
-		headers_msk[k] = v
-	}
-
-	spanContext := span.SpanContext()
-	headers_msk["trace-request-id"] = trace_id
-	headers_msk["TraceID"] = spanContext.TraceID().String()
-	headers_msk["SpanID"] = spanContext.SpanID().String()
-
+	//--------------------------------------------------------
 	// publish event
+	// ------------------------------------------------------
 	err = s.workerEvent.ProducerWorker.Producer(s.workerEvent.Topics[0], 
 												key, 
-												&headers_msk, 
+												kafkaHeaders,
 												payload_bytes)
-		
-	//force a error SIMULARTION
-	//if(trace_id == "force-rollback"){
-	//	err = erro.ErrForceRollback
-	//}
-	
 	if err != nil {
 		s.logger.Error().
 				Ctx(ctx).
@@ -270,20 +265,23 @@ func(s *WorkerService) ProducerEventKafka(	ctx context.Context,
 	if err != nil {
 		s.logger.Error().
 				Ctx(ctx).
-				Err(err).Msg("Failed to Kafka CommitTransaction = KAFKA ROLLBACK COMMIT !!!")
+				Err(err).
+				Msg("Failed to Kafka CommitTransaction = KAFKA ROLLBACK COMMIT !!!")
 
 		errMskAbort := s.workerEvent.ProducerWorker.AbortTransaction(ctx)
 		if errMskAbort != nil {
 			s.logger.Error().
 				Ctx(ctx).
-				Err(errMskAbort).Msg("failed to kafka AbortTransaction during CommitTransaction")
+				Err(errMskAbort).
+				Msg("failed to kafka AbortTransaction during CommitTransaction")
 			return errMskAbort
 		}
 		return err
 	}
 
 	s.logger.Info().
-			Ctx(ctx).Msg("KAFKA SUCCESS COMMIT !!!")
+			Ctx(ctx).
+			Msg("KAFKA PRODUCER COMMIT SUCCESS !!!")
 
     return 
 }

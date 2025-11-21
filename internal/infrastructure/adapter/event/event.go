@@ -32,10 +32,6 @@ func NewWorkerEventTX(ctx context.Context,
 	logger.Debug().
 			Str("func","NewWorkerEventTX").Send()
 
-	//trace
-	ctx, span := tracerProvider.SpanCtx(ctx, "adapter.event.NewWorkerEventTX")
-	defer span.End()
-
 	producerWorker, err := go_core_event.NewProducerWorkerTX(kafkaConfigurations,
 															appLogger)
 	if err != nil {
@@ -64,10 +60,6 @@ func NewWorkerEventTX(ctx context.Context,
 func (w *WorkerEvent) DestroyWorkerEventProducerTx(ctx context.Context) (error) {
 	w.logger.Info().
 			Str("func","DestroyWorkerEventProducerTx").Send()
-
-	//trace
-	ctx, span := tracerProvider.SpanCtx(ctx, "adapter.event.DestroyWorkerEventProducerTx")
-	defer span.End()
 
 	w.ProducerWorker.Close()	
 
