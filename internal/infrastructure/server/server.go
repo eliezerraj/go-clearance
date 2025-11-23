@@ -19,6 +19,19 @@ import(
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux"
+	
+	//metrics
+	go_core_otel_metric "github.com/eliezerraj/go-core/v2/otel/metric"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/attribute"
+)
+
+// metrics variables
+var(
+	tpsMetric 		metric.Int64Counter	
+	meter     		metric.Meter
+	latencyMetric  	metric.Float64Histogram
 )
 
 type HttpAppServer struct {
@@ -49,13 +62,48 @@ func (h *HttpAppServer) StartHttpAppServer(	ctx context.Context,
 	h.logger.Info().
 			Str("func","StartHttpAppServer").Send()
 
-	appRouter := mux.NewRouter().StrictSlash(true)
+	// ------------------------------
+	if h.appServer.Application.OtelTraces {
+		appInfoMetric := go_core_otel_metric.InfoMetric{Name: h.appServer.Application.Name,
+														Version: h.appServer.Application.Version,
+													}
 
+		metricProvider, err := go_core_otel_metric.NewMeterProvider(ctx, 
+																	appInfoMetric, 
+																	h.logger)
+		if err != nil {
+			h.logger.Warn().
+					Ctx(ctx).
+					Err(err).
+					Msg("error create a MetricProvider WARNING")
+		}
+		otel.SetMeterProvider(metricProvider)
+
+		meter = metricProvider.Meter(h.appServer.Application.Name )
+
+		tpsMetric, err = meter.Int64Counter("transaction_request_custom")
+		if err != nil {
+			h.logger.Warn().
+				Ctx(ctx).
+				Err(err).
+				Msg("error create a TPS METRIC WARNING")
+		}
+
+		latencyMetric, err = meter.Float64Histogram("latency_request_custom")
+			if err != nil {
+			h.logger.Warn().
+				Ctx(ctx).
+				Err(err).
+				Msg("error create a LATENCY METRIC WARNING")
+		}
+	}
+   //----------------------------------------
+
+	appRouter := mux.NewRouter().StrictSlash(true)
 	// creata a middleware component
 	appMiddleWare := go_core_midleware.NewMiddleWare(h.logger)										
 					
 	appRouter.Use(appMiddleWare.MiddleWareHandlerHeader)
-
 	appRouter.Handle("/metrics", promhttp.Handler())
 
 	// setting routers
@@ -97,6 +145,7 @@ func (h *HttpAppServer) StartHttpAppServer(	ctx context.Context,
 	}
 
 	h.logger.Info().
+			Ctx(ctx).
 			Str("Service Port", strconv.Itoa(h.appServer.Server.Port)).Send()
 	
 	// start server
@@ -104,7 +153,9 @@ func (h *HttpAppServer) StartHttpAppServer(	ctx context.Context,
 		err := srv.ListenAndServe()
 		if err != nil {
 			h.logger.Warn().
-					Err(err).Msg("Canceling http mux server !!!")
+					Ctx(ctx).
+					Err(err).
+					Msg("Canceling http mux server !!!")
 		}
 	}()
 
@@ -118,21 +169,48 @@ func (h *HttpAppServer) StartHttpAppServer(	ctx context.Context,
 		switch sig {
 		case syscall.SIGHUP:
 			h.logger.Info().
+					Ctx(ctx).
 					Msg("Received SIGHUP: Reloading Configuration...")
 		case syscall.SIGINT, syscall.SIGTERM:
 			h.logger.Info().
+					Ctx(ctx).
 					Msg("Received SIGINT/SIGTERM: Http Server Exit ...")
 			return
 		default:
 			h.logger.Info().
+					Ctx(ctx).
 					Interface("Received signal:", sig).Send()
 		}
 	}
 
 	if err := srv.Shutdown(ctx); err != nil && err != http.ErrServerClosed {
 		h.logger.Warn().
+				Ctx(ctx).
 				Err(err).
 				Msg("Dirty shutdown WARNING !!!")
 		return
 	}
-}	
+}
+
+func middlewareMetric(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+
+		tpsMetric.Add(r.Context(), 1,
+			metric.WithAttributes(
+				attribute.String("method", r.Method),
+				attribute.String("path", r.URL.Path),
+			),
+		)
+
+		next(w, r)
+
+		duration := time.Since(start).Seconds()
+		latencyMetric.Record(r.Context(), duration,
+			metric.WithAttributes(
+				attribute.String("method", r.Method),
+				attribute.String("path", r.URL.Path),
+			),
+		)
+	}
+}

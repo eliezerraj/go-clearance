@@ -40,6 +40,7 @@ func NewWorkerRepository(databasePG *go_core_db_pg.DatabasePGServer,
 // Above get stats from database
 func (w *WorkerRepository) Stat(ctx context.Context) (go_core_db_pg.PoolStats){
 	w.logger.Info().
+			Ctx(ctx).
 			Str("func","Stat").Send()
 	
 	stats := w.DatabasePG.Stat()
@@ -293,13 +294,5 @@ func (w *WorkerRepository) GetPaymentFromOrder(	ctx context.Context,
 		listPayment = append(listPayment, resPayment)
 	}
 
-	/*if listPayment == ([]model.Payment{}) {
-		w.logger.Warn().
-				Ctx(ctx).
-				Err(erro.ErrNotFound).
-				Interface("Order.ID",Order.ID).Send()
-		return nil, erro.ErrNotFound
-	}*/
-		
 	return &listPayment, nil
 }

@@ -69,7 +69,12 @@ func (s * WorkerService) HealthCheck(ctx context.Context) error {
 	s.logger.Info().
 			Str("func","HealthCheck").Send()
 
+	ctx, span := tracerProvider.SpanCtx(ctx, "service.HealthCheck")
+	defer span.End()
+
 	// Check database health
+	_, spanDB := tracerProvider.SpanCtx(ctx, "DatabasePG.Ping")
+
 	err := s.workerRepository.DatabasePG.Ping()
 	if err != nil {
 		s.logger.Error().
@@ -77,6 +82,8 @@ func (s * WorkerService) HealthCheck(ctx context.Context) error {
 		return erro.ErrHealthCheck
 	}
 
+	spanDB.End()
+	
 	s.logger.Info().
 			Str("func","HealthCheck").
 			Msg("*** Database HEALTH CHECK SUCCESSFULL ***")
@@ -222,9 +229,11 @@ func(s *WorkerService) ProducerEventKafka(ctx context.Context,
 	}
 
 	// Prepare to event
-	//key := strconv.Itoa(key)
 	payload_bytes, err := json.Marshal(event)
 	if err != nil {
+		s.logger.Error().
+				Ctx(ctx).
+				Err(err).Send()
 		return err
 	}
 

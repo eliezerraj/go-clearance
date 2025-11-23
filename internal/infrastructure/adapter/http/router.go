@@ -89,17 +89,11 @@ func (h *HttpRouters) ErrorHandler(trace_id string, err error) *go_core_midlewar
 
 // About return a health
 func (h *HttpRouters) Health(rw http.ResponseWriter, req *http.Request) {
-	h.logger.Info().
-			Str("func","Health").Send()
-
 	json.NewEncoder(rw).Encode(model.MessageRouter{Message: "true"})
 }
 
 // About return a live
 func (h *HttpRouters) Live(rw http.ResponseWriter, req *http.Request) {
-	h.logger.Info().
-			Str("func","Live").Send()
-
 	json.NewEncoder(rw).Encode(model.MessageRouter{Message: "true"})
 }
 

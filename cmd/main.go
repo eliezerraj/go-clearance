@@ -138,9 +138,11 @@ func main (){
 		if err != nil {
 			if count < 3 {
 				logger.Warn().
+						Ctx(ctx).
 						Err(err).Msg("error open database... trying again WARNING")
 			} else {
 				logger.Fatal().
+						Ctx(ctx).
 						Err(err).Msg("Fatal Error open Database ABORTING")
 				panic(err)
 			}
@@ -158,10 +160,12 @@ func main (){
 													   &appLogger)
 	if err != nil {
 		logger.Error().
+				Ctx(ctx).
 				Err(err).
 				Msg("Error create Kafka Producer ERROR")
 	} else {
 		logger.Info().
+				Ctx(ctx).
 				Msg("KAFKA Producer SUCCESSFULL")
 	}
 
@@ -184,10 +188,12 @@ func main (){
 	err = workerService.HealthCheck(ctx)
 	if err != nil {
 		logger.Error().
-					Err(err).
-					Msg("Error health check support services ERROR")
+				Ctx(ctx).
+				Err(err).
+				Msg("Error health check support services ERROR")
 	} else {
 		logger.Info().
+				Ctx(ctx).
 				Msg("SERVICES HEALTH CHECK OK")
 	}
 
@@ -198,6 +204,7 @@ func main (){
 			err := sdkTracerProvider.Shutdown(ctx)
 			if err != nil{
 				logger.Error().
+						Ctx(ctx).
 						Err(err).
 						Msg("Erro to shutdown tracer provider")
 			}
@@ -215,6 +222,7 @@ func main (){
 		cancel()
 
 		logger.Info().
+				Ctx(ctx).
 				Msgf("App %s Finalized SUCCESSFULL !!!", appServer.Application.Name)
 	}()
 
