@@ -1,0 +1,102 @@
+name: Setup environment
+
+on:
+  workflow_call:
+    inputs:
+      AWS_ACCOUNT_ID:
+        required: true
+        type: string
+      REGION:
+        required: true
+        type: string
+
+    outputs:
+      AWS_ACCOUNT_ID:
+        description: 'AWS Account ID'
+        value: ${{ jobs.set-workflow-variables.outputs.AWS_ACCOUNT_ID }}
+      AWS_REGION:
+        description: 'AWS Region'
+        value: ${{ jobs.set-workflow-variables.outputs.AWS_REGION }}
+      REPO_NAME:
+        description: 'Repository name'
+        value: ${{ jobs.set-workflow-variables.outputs.REPO_NAME }}
+      MAIN_GO_FILE:
+        description: 'Main go file path'
+        value: ${{ jobs.set-workflow-variables.outputs.MAIN_GO_FILE }}
+      CLOUDFORMATION_TEMPLATE_PATH:
+        description: 'CloudFormation template path'
+        value: ${{ jobs.set-workflow-variables.outputs.CLOUDFORMATION_TEMPLATE_PATH }}
+      CLOUDFORMATION_TEMPLATE_PARAMETERS_PATH:
+        description: 'CloudFormation template parameters path'
+        value: ${{ jobs.set-workflow-variables.outputs.CLOUDFORMATION_TEMPLATE_PARAMETERS_PATH }}
+      ENVIRONMENT:
+        description: 'Environment'
+        value: ${{ jobs.set-workflow-variables.outputs.ENVIRONMENT }}
+      CLUSTER_NAME:
+        description: 'Cluster name'
+        value: ${{ jobs.set-workflow-variables.outputs.CLUSTER_NAME }}
+      CLUSTER_NAMESPACE:
+        description: 'Cluster namespace'
+        value: ${{ jobs.set-workflow-variables.outputs.CLUSTER_NAMESPACE }}
+      KUBERNETES_MANIFEST_PATH:
+        description: 'Kubernetes manifest path'
+        value: ${{ jobs.set-workflow-variables.outputs.KUBERNETES_MANIFEST_PATH }}
+      IMAGE_TAG:
+        description: 'Image tag'
+        value: ${{ jobs.set-workflow-variables.outputs.IMAGE_TAG }}
+
+jobs:
+  set-workflow-variables:
+    runs-on: ubuntu-latest
+    outputs:
+      AWS_ACCOUNT_ID: ${{ steps.set_variables.outputs.AWS_ACCOUNT_ID }}
+      AWS_REGION: ${{ steps.set_variables.outputs.AWS_REGION }}
+      REPO_NAME: ${{ steps.repo_name.outputs.REPO_NAME }}
+      MAIN_GO_FILE: ${{ steps.main_go_file.outputs.MAIN_GO_FILE }}
+      CLOUDFORMATION_TEMPLATE_PATH: ${{ steps.cloudformation_template_path.outputs.CLOUDFORMATION_TEMPLATE_PATH }}
+      CLOUDFORMATION_TEMPLATE_PARAMETERS_PATH: ${{ steps.set_variables.outputs.CLOUDFORMATION_TEMPLATE_PARAMETERS_PATH }}
+      ENVIRONMENT: ${{ steps.set_variables.outputs.ENVIRONMENT }}
+      CLUSTER_NAME: ${{ steps.set_variables.outputs.CLUSTER_NAME }}
+      CLUSTER_NAMESPACE: ${{ steps.set_variables.outputs.CLUSTER_NAMESPACE }}
+      IMAGE_TAG: ${{ steps.image_tag.outputs.IMAGE_TAG }}
+      KUBERNETES_MANIFEST_PATH: ${{ steps.kubernetes_manifest_path.outputs.KUBERNETES_MANIFEST_PATH }}
+
+    steps:
+      - id: repo_name
+        run: echo "REPO_NAME=$(basename ${{ github.repository }})" >> "$GITHUB_OUTPUT"
+      - id: main_go_file
+        run: echo "MAIN_GO_FILE=cmd/main.go" >> "$GITHUB_OUTPUT"
+      - id: cloudformation_template_path
+        run: echo "CLOUDFORMATION_TEMPLATE_PATH=assets/cloudformation/template/stack-cloudformation.yaml" >> "$GITHUB_OUTPUT"
+      - id: image_tag
+        run: echo "IMAGE_TAG=latest" >> "$GITHUB_OUTPUT"
+      - id: kubernetes_manifest_path
+        run: echo "KUBERNETES_MANIFEST_PATH=assets/kubernetes/aws" >> "$GITHUB_OUTPUT"
+      - id: set_variables # Define env var
+        run: |
+          case "${{ github.ref }}" in
+            "refs/heads/main")
+              echo "AWS_ACCOUNT_ID=992382474575"  >> "$GITHUB_OUTPUT" # TODO Variaveis de conta em nível de org?
+              echo "AWS_REGION=us-east-2"         >> "$GITHUB_OUTPUT"
+              echo "ENVIRONMENT=dev"              >> "$GITHUB_OUTPUT"
+              echo "CLUSTER_NAME=arch-eks-002"  >> "$GITHUB_OUTPUT"
+              echo "CLUSTER_NAMESPACE=test-a"     >> "$GITHUB_OUTPUT"              
+              echo "CLOUDFORMATION_TEMPLATE_PARAMETERS_PATH=file://${{ github.workspace }}/assets/cloudformation/parameter/dev.json" >> "$GITHUB_OUTPUT"
+              ;;
+            refs/heads/master)
+              echo "AWS_ACCOUNT_ID=992382474575"  >> "$GITHUB_OUTPUT"
+              echo "AWS_REGION=us-east-2"         >> "$GITHUB_OUTPUT"
+              echo "ENVIRONMENT=dev"              >> "$GITHUB_OUTPUT"
+              echo "CLUSTER_NAME==arch-eks-002" >> "$GITHUB_OUTPUT"
+              echo "CLUSTER_NAMESPACE=test-a"     >> "$GITHUB_OUTPUT"
+              echo "CLOUDFORMATION_TEMPLATE_PARAMETERS_PATH=file://${{ github.workspace }}/assets/cloudformation/parameter/dev.json" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "AWS_ACCOUNT_ID=992382474575"  >> "$GITHUB_OUTPUT"
+              echo "AWS_REGION=us-east-2"         >> "$GITHUB_OUTPUT"
+              echo "ENVIRONMENT=dev"              >> "$GITHUB_OUTPUT"
+              echo "CLUSTER_NAME=arch-eks-002"    >> "$GITHUB_OUTPUT"
+              echo "CLUSTER_NAMESPACE=test-a"   >> "$GITHUB_OUTPUT"
+              echo "CLOUDFORMATION_TEMPLATE_PARAMETERS_PATH=file://${{ github.workspace }}/assets/cloudformation/parameter/dev.json" >> "$GITHUB_OUTPUT"   
+              ;;
+          esac

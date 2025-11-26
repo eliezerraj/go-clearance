@@ -1,0 +1,42 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: &app-name go-clearance-cm
+  namespace: test-a
+  labels:
+    app: *app-name
+data:
+  VERSION: "1.0"
+  ACCOUNT: "aws:992382474575"
+  APP_NAME: "go-clearance.arch-eks-002"
+  PORT: "7001"
+  ENV: "dev"
+
+  DB_HOST: "rds-proxy-db-arch-02.proxy-cj4aqa08ettf.us-east-2.rds.amazonaws.com"
+  DB_PORT: "5432"
+  DB_NAME: "postgres"
+  DB_MAX_CONNECTION: "10"
+  CTX_TIMEOUT: "5"
+
+  LOG_LEVEL: "info" #info, error, warning
+  OTEL_EXPORTER_OTLP_ENDPOINT: "localhost:4317"
+
+  OTEL_METRICS: "false"
+  OTEL_STDOUT_TRACER: "false"
+  OTEL_TRACES: "false"
+
+  OTEL_LOGS: "false"
+  OTEL_STDOUT_LOG_GROUP: "false"
+  LOG_GROUP: "/mnt/c/Eliezer/log/go-clearance.log"
+
+  KAFKA_USER: "admin"
+  KAFKA_PASSWORD: "admin"
+  KAFKA_PROTOCOL: "SASL_SSL"
+  KAFKA_MECHANISM: "SCRAM-SHA-512"
+  KAFKA_CLIENT_ID: "GO-CLEARANCE-LOCAL"
+  KAFKA_BROKER_1: "b-1.mskarch01.x25pj7.c3.kafka.us-east-2.amazonaws.com:9096" 
+  KAFKA_BROKER_2: "b-3.mskarch01.x25pj7.c3.kafka.us-east-2.amazonaws.com:9096" 
+  KAFKA_BROKER_3: "b-2.mskarch01.x25pj7.c3.kafka.us-east-2.amazonaws.com:9096" 
+  KAFKA_PARTITION: "3"
+  KAFKA_REPLICATION: "1"
+  TOPIC_EVENT: "topic.clearance.local"
