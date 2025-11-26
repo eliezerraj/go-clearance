@@ -18,5 +18,9 @@
   {
     "ParameterKey": "ServiceAccountName",
     "ParameterValue": "sa-go-clearance"
+  },
+  {
+    "ParameterKey": "RoleName",
+    "ParameterValue": "GoClearance"
   }
 ]

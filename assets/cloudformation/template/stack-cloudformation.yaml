@@ -5,6 +5,9 @@ Parameters:
   RepositoryName: 
     Type: String
     Default: go-clearance
+  RoleName:
+    Type: String
+    Default: GoClearance 
   Env:
     Type: String
     Default: dev
@@ -108,7 +111,7 @@ Resources:
   PodIdentityIAMRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: PodIdentityGoInventoryRole
+      RoleName: !Sub "${RoleName}-Role"
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -119,7 +122,7 @@ Resources:
               - 'sts:AssumeRole'
               - 'sts:TagSession'
       Policies:
-      - PolicyName: PodGoInventoryPolicy
+      - PolicyName: !Sub "${RoleName}-Policy"
         PolicyDocument:
           Statement:
           - Action: #TODO add custom policy for S3
