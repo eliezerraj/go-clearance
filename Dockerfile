@@ -10,7 +10,7 @@ COPY . .
 RUN go mod tidy
 
 WORKDIR /app/cmd
-RUN go build -o go-carclearancet -ldflags '-linkmode external -w -extldflags "-static"'
+RUN go build -o go-clearance -ldflags '-linkmode external -w -extldflags "-static"'
 
 FROM alpine
 

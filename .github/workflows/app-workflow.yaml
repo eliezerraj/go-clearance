@@ -196,5 +196,5 @@ jobs:
           kubectl apply --kubeconfig /home/runner/.kube/config --validate=false --validate=false --namespace=${{ needs.setup-environment.outputs.CLUSTER_NAMESPACE }} -f ${{ needs.setup-environment.outputs.KUBERNETES_MANIFEST_PATH }}/hpa.yaml
           kubectl apply --kubeconfig /home/runner/.kube/config --validate=false --validate=false --namespace=${{ needs.setup-environment.outputs.CLUSTER_NAMESPACE }} -f ${{ needs.setup-environment.outputs.KUBERNETES_MANIFEST_PATH }}/pod-disruption.yaml
           kubectl apply --kubeconfig /home/runner/.kube/config --validate=false --validate=false --namespace=${{ needs.setup-environment.outputs.CLUSTER_NAMESPACE }} -f ${{ needs.setup-environment.outputs.KUBERNETES_MANIFEST_PATH }}/external-secret.yaml
-          kubectl apply --kubeconfig /home/runner/.kube/config --validate=false --validate=false --namespace=${{ needs.setup-environment.outputs.CLUSTER_NAMESPACE }} -f ${{ needs.setup-environment.outputs.KUBERNETES_MANIFEST_PATH }}/secret-store-service-account.yaml
-          kubectl rollout restart deployment/go-cart --namespace=${{ needs.setup-environment.outputs.CLUSTER_NAMESPACE }}
+          kubectl apply --kubeconfig /home/runner/.kube/config --validate=false --validate=false --namespace=${{ needs.setup-environment.outputs.CLUSTER_NAMESPACE }} -f ${{ needs.setup-environment.outputs.KUBERNETES_MANIFEST_PATH }}/secret-store.yaml
+          kubectl rollout restart deployment/go-clearance --namespace=${{ needs.setup-environment.outputs.CLUSTER_NAMESPACE }}
