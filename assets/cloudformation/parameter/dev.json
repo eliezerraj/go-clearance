@@ -1,0 +1,22 @@
+[
+  {
+    "ParameterKey": "Env",
+    "ParameterValue": "dev"
+  },
+  {
+    "ParameterKey": "RepositoryName",
+    "ParameterValue": "go-clearance"
+  },
+  {
+    "ParameterKey": "Namespace",
+    "ParameterValue": "test-a"
+  },
+  {
+    "ParameterKey": "ClusterName",
+    "ParameterValue": "arch-eks-002"
+  },
+  {
+    "ParameterKey": "ServiceAccountName",
+    "ParameterValue": "sa-go-clearance"
+  }
+]

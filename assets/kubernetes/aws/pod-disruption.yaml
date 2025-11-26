@@ -1,0 +1,10 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: pdb-go-clearance
+  namespace: test-a
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+        app: go-clearance

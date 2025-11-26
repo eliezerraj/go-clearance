@@ -1,0 +1,187 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Template GitAction v2.0 - 23/11/2025
+
+Parameters:
+  RepositoryName: 
+    Type: String
+    Default: go-clearance
+  Env:
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+      - hml
+      - prd
+  BusinessUnitName:
+    Type: String
+    Default: architecture
+  PlatformName:
+    Type: String
+    Default: architecture
+  ApplicationName:
+    Type: String
+    Default: go-clearance
+  ComponentName:
+    Type: String
+    Default: ecr
+  PciClassificationName:
+    Type: String
+    Default: non-pci
+    AllowedValues:
+      - pci
+      - pci-connected
+      - non-pci
+  Owner:
+    Type: String
+    Default: architecture
+
+  ClusterName:
+    Type: String
+    Description: The name of your EKS cluster.
+    Default: arch-eks-002
+  Namespace:
+    Type: String
+    Description: The Kubernetes namespace where the service account resides.
+    Default: test-a
+  ServiceAccountName:
+    Type: String
+    Description: The name of the Kubernetes service account.
+    Default: sa-go-clearance
+
+Resources:
+  EcrRepo:
+    Type: "AWS::ECR::Repository"
+    Properties:
+      RepositoryName:  !Ref RepositoryName
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {
+            "rules": [
+              {
+                "rulePriority": 1,
+                "description": "Keep only the last 6 images",
+                "selection": {
+                  "tagStatus": "any",
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 6
+                },
+                "action": {
+                  "type": "expire"
+                }
+              }
+            ]
+          }
+      RepositoryPolicyText:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: "AllowPublicRead"
+            Effect: "Allow"
+            Principal: "*"
+            Action:
+              - "ecr:GetDownloadUrlForLayer"
+              - "ecr:BatchGetImage"
+              - "ecr:BatchCheckLayerAvailability"
+      Tags:
+        - Key: env
+          Value: !Ref Env
+        - Key: stack
+          Value: !Sub ${AWS::StackName}
+        - Key: name
+          Value: !Ref RepositoryName
+        - Key: resource
+          Value: DBParameterGroup
+        - Key: business_unit
+          Value: !Ref BusinessUnitName
+        - Key: platform
+          Value: !Ref PlatformName
+        - Key: application
+          Value: !Ref ApplicationName
+        - Key: component
+          Value: !Ref ComponentName
+        - Key: owner
+          Value: !Ref Owner
+        - Key: pci_classification
+          Value: !Ref PciClassificationName
+
+  PodIdentityIAMRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: PodIdentityGoInventoryRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: 'pods.eks.amazonaws.com'
+            Action:
+              - 'sts:AssumeRole'
+              - 'sts:TagSession'
+      Policies:
+      - PolicyName: PodGoInventoryPolicy
+        PolicyDocument:
+          Statement:
+          - Action: #TODO add custom policy for S3
+            - s3:PutObject
+            Resource: '*'
+            Effect: Allow
+          - Action: #TODO add custom policy for SQS            
+              - sqs:SendMessage
+              - sqs:ReceiveMessage
+              - sqs:DeleteMessage
+              - sqs:GetQueueAttributes
+              - sqs:GetQueueUrl
+              - sqs:CreateQueue
+            Resource: '*'
+            Effect: Allow
+          - Action:
+            - kms:Decrypt
+            - secretsmanager:GetResourcePolicy
+            - secretsmanager:GetSecretValue
+            - secretsmanager:DescribeSecret
+            - secretsmanager:ListSecrets
+            - secretsmanager:ListSecretVersionIds
+            Resource: '*'
+            Effect: Allow
+          - Action:
+            - elasticfilesystem:DescribeAccessPoints
+            - elasticfilesystem:DescribeFileSystems
+            - elasticfilesystem:DescribeMountTargets
+            - ec2:DescribeAvailabilityZones
+            Resource: '*'
+            Effect: Allow
+          - Action:
+            - elasticfilesystem:CreateAccessPoint
+            Condition:
+              StringLike:
+                "aws:RequestTag/efs.csi.aws.com/cluster": true
+            Resource: '*'
+            Effect: Allow
+          - Action:
+            - elasticfilesystem:DeleteAccessPoint
+            Condition:
+              StringEquals:
+                "aws:ResourceTag/efs.csi.aws.com/cluster": true
+            Resource: '*'
+            Effect: Allow  
+
+  PodIdentityAssociation:
+    Type: AWS::EKS::PodIdentityAssociation
+    Properties:
+      ClusterName: !Ref ClusterName
+      Namespace: !Ref Namespace
+      ServiceAccount: !Ref ServiceAccountName
+      RoleArn: !GetAtt PodIdentityIAMRole.Arn
+
+  ESOPodIdentityAssociation:
+    Type: AWS::EKS::PodIdentityAssociation
+    Properties:
+      ClusterName: !Ref ClusterName
+      Namespace: external-secrets 
+      ServiceAccount: external-secrets
+      RoleArn: !GetAtt PodIdentityIAMRole.Arn
+            
+Outputs:
+  EcrRepo:
+    Value: !GetAtt EcrRepo.RepositoryUri
