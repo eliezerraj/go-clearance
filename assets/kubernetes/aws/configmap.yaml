@@ -9,7 +9,7 @@ data:
   VERSION: "1.0"
   ACCOUNT: "aws:992382474575"
   APP_NAME: "go-clearance.arch-eks-002"
-  PORT: "7001"
+  PORT: "7003"
   ENV: "dev"
 
   DB_HOST: "rds-proxy-db-arch-02.proxy-cj4aqa08ettf.us-east-2.rds.amazonaws.com"

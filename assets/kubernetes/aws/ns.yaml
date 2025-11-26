@@ -1,0 +1,12 @@
+kind: Namespace
+apiVersion: v1
+metadata:
+  name: test-a
+  #labels:
+    # baseline Standard with enforce Mode 
+    # more info https://kubernetes.io/docs/concepts/security/pod-security-standards/#restricted
+    #pod-security.kubernetes.io/enforce: baseline
+    #pod-security.kubernetes.io/enforce-version: v1.28
+    # restricted Standard with warn Mode
+    #pod-security.kubernetes.io/warn: restricted
+    #pod-security.kubernetes.io/warn-version: v1.28
