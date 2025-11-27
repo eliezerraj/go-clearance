@@ -1,0 +1,28 @@
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: Gateway
+metadata:
+  name: alb-arch-eks-002-gateway
+  namespace: test-a
+  labels:
+    app: alb-arch-eks-002-gateway
+spec:
+  gatewayClassName: aws-alb-gateway-class
+  infrastructure:
+    parametersRef:
+      kind: LoadBalancerConfiguration
+      group: gateway.k8s.aws  
+      name: arch-eks-002-lbconfigv1
+  listeners:
+    - name: https-listener
+      protocol: HTTPS
+      port: 443
+      hostname: "*.architecturedev.caradhras.io" 
+      allowedRoutes:
+        namespaces:
+          from: All
+    - name: http-listener
+      protocol: HTTP
+      port: 80
+      allowedRoutes:
+        namespaces:
+          from: All

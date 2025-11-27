@@ -1,0 +1,8 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: aws-alb-gateway-class
+  labels:
+    app: aws-alb-gateway-class
+spec:
+  controllerName: gateway.k8s.aws/alb
