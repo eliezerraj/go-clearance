@@ -1,0 +1,19 @@
+apiVersion: gateway.k8s.aws/v1beta1
+kind: LoadBalancerConfiguration
+metadata:
+  name: arch-eks-002-lbconfigv1
+  namespace: test-a
+  labels:
+    app: arch-eks-002-lbconfigv1
+spec:
+  scheme: internal
+  listenerConfigurations:
+    - protocolPort: HTTP:80
+    - protocolPort: HTTPS:443
+      certificates: 
+      - arn:aws:acm:us-east-2:992382474575:certificate/6be53392-cd0e-46b2-98e9-d0d037abc90c
+      sslPolicy: ELBSecurityPolicy-TLS13-1-2-2021-06
+  loadBalancerSubnets:
+    - identifier:  subnet-0ca2d45be9d6ab5bc
+    - identifier:  subnet-05d3e7f4611c12a23
+    - identifier:  subnet-0b2b57acbb1da0623
