@@ -194,23 +194,28 @@ func (h *HttpAppServer) StartHttpAppServer(	ctx context.Context,
 
 func middlewareMetric(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		start := time.Now()
 
-		tpsMetric.Add(r.Context(), 1,
-			metric.WithAttributes(
-				attribute.String("method", r.Method),
-				attribute.String("path", r.URL.Path),
-			),
-		)
+		if tpsMetric != nil && latencyMetric != nil {
+			start := time.Now()
 
-		next(w, r)
+			tpsMetric.Add(r.Context(), 1,
+				metric.WithAttributes(
+					attribute.String("method", r.Method),
+					attribute.String("path", r.URL.Path),
+				),
+			)
 
-		duration := time.Since(start).Seconds()
-		latencyMetric.Record(r.Context(), duration,
-			metric.WithAttributes(
-				attribute.String("method", r.Method),
-				attribute.String("path", r.URL.Path),
-			),
-		)
+			next(w, r)
+
+			duration := time.Since(start).Seconds()
+			latencyMetric.Record(r.Context(), duration,
+				metric.WithAttributes(
+					attribute.String("method", r.Method),
+					attribute.String("path", r.URL.Path),
+				),
+			)
+		} else {
+			next(w, r)
+		}
 	}
 }

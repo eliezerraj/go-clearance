@@ -19,7 +19,7 @@ data:
   CTX_TIMEOUT: "5"
 
   LOG_LEVEL: "info" #info, error, warning
-  OTEL_EXPORTER_OTLP_ENDPOINT: "localhost:4317"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "arch-eks-002-otel-collector.default.svc.cluster.local:4317"
 
   OTEL_METRICS: "false"
   OTEL_STDOUT_TRACER: "false"
@@ -33,10 +33,15 @@ data:
   KAFKA_PASSWORD: "admin"
   KAFKA_PROTOCOL: "SASL_SSL"
   KAFKA_MECHANISM: "SCRAM-SHA-512"
-  KAFKA_CLIENT_ID: "GO-CLEARANCE-LOCAL"
+  KAFKA_CLIENT_ID: "GO-CLEARANCE-01"
   KAFKA_BROKER_1: "b-1.mskarch01.x25pj7.c3.kafka.us-east-2.amazonaws.com:9096" 
   KAFKA_BROKER_2: "b-3.mskarch01.x25pj7.c3.kafka.us-east-2.amazonaws.com:9096" 
   KAFKA_BROKER_3: "b-2.mskarch01.x25pj7.c3.kafka.us-east-2.amazonaws.com:9096" 
   KAFKA_PARTITION: "3"
   KAFKA_REPLICATION: "1"
-  TOPIC_EVENT: "topic.clearance.local"
+  TOPIC_EVENT: "topic.clearance.01"
+
+  NAME_SERVICE_00: "go-order"
+  URL_SERVICE_00: "http://go-order.architecture.caradhras.io"
+  HOST_SERVICE_00: "go-order"
+  CLIENT_HTTP_TIMEOUT_00: "5"

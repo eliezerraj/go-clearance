@@ -53,6 +53,12 @@ type Endpoint struct {
 	HttpTimeout		time.Duration `json:"httpTimeout"`
 }
 
+type APIError struct {
+	StatusCode	int    `json:"statusCode"`
+	Msg			string `json:"message"`
+	TraceId		string `json:"request-id,omitempty"`
+}
+
 type Payment struct {
 	ID			int			`json:"id,omitempty"`
 	Order		*Order		`json:"order,omitempty"`
@@ -62,7 +68,8 @@ type Payment struct {
 	Currency	string 		`json:"currency,omitempty"`
 	Amount		float64 	`json:"amount,omitempty"`
 	CreatedAt	time.Time 	`json:"created_at,omitempty"`
-	UpdatedAt	*time.Time 	`json:"update_at,omitempty"`	
+	UpdatedAt	*time.Time 	`json:"update_at,omitempty"`
+	StepProcess	*[]StepProcess `json:step_process,omitempty"`		
 }
 
 type Order struct {
@@ -70,6 +77,7 @@ type Order struct {
 	Type		string 	`json:"type,omitempty"`
 	Status		string 	`json:"status,omitempty"`
 	Currency	string 	`json:"currency,omitempty"`	
+	Amount		float64 `json:"amount,omitempty"`	
 }
 
 type Event struct{
@@ -77,4 +85,9 @@ type Event struct{
 	Type		string		 `json:"event_type,omitempty"`
 	EventAt		time.Time 	 `json:"event_date,omitempty"`
 	EventData	interface {} `json:"event_data,omitempty"`
+}
+
+type StepProcess struct {
+	Name		string  	`json:"step_process,omitempty"`
+	ProcessedAt	time.Time 	`json:"processed_at,omitempty"`
 }

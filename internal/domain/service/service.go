@@ -5,6 +5,8 @@ import (
 	"time"
 	"context"
 	"sync"
+	"errors"
+	"net/http"
 	"encoding/json"
 
 	"github.com/rs/zerolog"
@@ -34,6 +36,67 @@ type WorkerService struct {
 	mutex    				sync.Mutex 	 	
 }
 
+// about do http call 
+func (s *WorkerService) doHttpCall(ctx context.Context,
+									httpClientParameter go_core_http.HttpClientParameter) (interface{},error) {
+		
+	resPayload, statusCode, err := s.httpService.DoHttp(ctx, 
+														httpClientParameter)
+	if err != nil {
+		s.logger.Error().
+				Ctx(ctx).
+				Err(err).Send()
+		return nil, err
+	}
+
+	if statusCode != http.StatusOK {
+		if statusCode == http.StatusNotFound {
+			s.logger.Error().
+					Ctx(ctx).
+					Err(erro.ErrNotFound).Send()
+			return nil, erro.ErrNotFound
+		} else {		
+			jsonString, err  := json.Marshal(resPayload)
+			if err != nil {
+				s.logger.Error().
+						Ctx(ctx).
+						Err(err).Send()
+				return nil, errors.New(err.Error())
+			}			
+			
+			message := model.APIError{}
+			json.Unmarshal(jsonString, &message)
+
+			newErr := errors.New(fmt.Sprintf("http call error: status code %d - message: %s", message.StatusCode ,message.Msg))
+			s.logger.Error().
+					Ctx(ctx).
+					Err(newErr).Send()
+			return nil, newErr
+		}
+	}
+
+	return resPayload, nil
+}
+
+// register a new step proccess
+func registerOrchestrationProcess(nameStepProcess string,
+								 listStepProcess *[]model.StepProcess) {
+
+	stepProcess := model.StepProcess{Name: nameStepProcess,
+									ProcessedAt: time.Now(),}
+
+	*listStepProcess = append(*listStepProcess, stepProcess)								
+}
+
+// About database stats
+func (s *WorkerService) Stat(ctx context.Context) (go_core_db_pg.PoolStats){
+	s.logger.Info().
+			Ctx(ctx).
+			Str("func","Stat").Send()
+
+	return s.workerRepository.Stat(ctx)
+}
+
 // About new worker service
 func NewWorkerService(appServer	*model.AppServer,
 					  workerRepository *database.WorkerRepository, 
@@ -54,14 +117,6 @@ func NewWorkerService(appServer	*model.AppServer,
 		workerEvent: workerEvent,
 		httpService: httpService,
 	}
-}
-
-// About database stats
-func (s *WorkerService) Stat(ctx context.Context) (go_core_db_pg.PoolStats){
-	s.logger.Info().
-			Str("func","Stat").Send()
-
-	return s.workerRepository.Stat(ctx)
 }
 
 // About check health service
@@ -118,9 +173,47 @@ func (s *WorkerService) AddPayment(ctx context.Context,
 		span.End()
 	}()
 
+	// get order details
+	// prepare headers http for calling services
+	trace_id := fmt.Sprintf("%v",ctx.Value("trace-request-id"))
+
+	headers := map[string]string{
+		"Content-Type":  "application/json;charset=UTF-8",
+		"X-Request-Id": trace_id,
+	}
+
+	httpClientParameter := go_core_http.HttpClientParameter {
+		Url:	fmt.Sprintf("%s%s%v", (*s.appServer.Endpoint)[0].Url , "/order/" , payment.Order.ID ),
+		Method:	"GET",
+		Timeout: (*s.appServer.Endpoint)[0].HttpTimeout,
+		Headers: &headers,
+	}
+
+	// call a service via http
+	resPayload, err := s.doHttpCall(ctx, 
+									httpClientParameter)
+	if err != nil {
+		s.logger.Error().
+				Ctx(ctx).
+				Err(err).Send()
+		return nil, err
+	}
+
+	// convert json to struct
+	jsonString, err  := json.Marshal(resPayload)
+	if err != nil {
+		s.logger.Error().
+				Ctx(ctx).
+				Err(err).Send()
+		return nil, errors.New(err.Error())
+	}
+	order := model.Order{}
+	json.Unmarshal(jsonString, &order)
+
 	// prepare data
 	now := time.Now()
 	payment.CreatedAt = now
+	payment.Order = &order
 
 	// Create payment
 	resPayment, err := s.workerRepository.AddPayment(ctx, tx, payment)
@@ -128,6 +221,9 @@ func (s *WorkerService) AddPayment(ctx context.Context,
 		return nil, err
 	}
 	payment.ID = resPayment.ID
+
+	// create saga orchestration process
+	listStepProcess := []model.StepProcess{}
 
 	// emit a event
 	if s.workerEvent != nil {
@@ -143,11 +239,12 @@ func (s *WorkerService) AddPayment(ctx context.Context,
 		if err != nil {
 			return nil, err
 		}
-		//res_moviment_transaction.Status = "event sended via kafka"
+		registerOrchestrationProcess("RECONCILIATION MSG KAFKA:OK", &listStepProcess)
 	} else {
-		//res_moviment_transaction.Status = "event not send, kafka unabled"
+		registerOrchestrationProcess("RECONCILIATION MSG KAFKA:NOK KAFKA UNABLE *nil)", &listStepProcess)
 	}
-	
+
+	payment.StepProcess = &listStepProcess
 	return payment, nil
 }
 
@@ -209,7 +306,10 @@ func(s *WorkerService) ProducerEventKafka(ctx context.Context,
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	// Create a transacrion
+	s.logger.Info().
+			Ctx(ctx).
+			Str("func","ProducerEventKafka").Msg("BeginTransaction")
+	// Create a transaction
 	err = s.workerEvent.ProducerWorker.BeginTransaction()
 	if err != nil {
 		s.logger.Error().
@@ -252,6 +352,9 @@ func(s *WorkerService) ProducerEventKafka(ctx context.Context,
 	//--------------------------------------------------------
 	// publish event
 	// ------------------------------------------------------
+	s.logger.Info().
+			Ctx(ctx).
+			Str("func","ProducerEventKafka").Msg("Producer MSG KAFKA")
 	err = s.workerEvent.ProducerWorker.Producer(s.workerEvent.Topics[0], 
 												key, 
 												kafkaHeaders,
@@ -270,6 +373,9 @@ func(s *WorkerService) ProducerEventKafka(ctx context.Context,
 		return err
 	}
 
+	s.logger.Info().
+			Ctx(ctx).
+			Str("func","ProducerEventKafka").Msg("CommitTransaction")
 	err = s.workerEvent.ProducerWorker.CommitTransaction(ctx)
 	if err != nil {
 		s.logger.Error().
