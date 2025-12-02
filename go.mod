@@ -4,7 +4,7 @@ go 1.23.3
 
 require (
 	github.com/confluentinc/confluent-kafka-go/v2 v2.8.0
-	github.com/eliezerraj/go-core v1.0.96
+	github.com/eliezerraj/go-core v1.0.97
 	github.com/gorilla/mux v1.8.1
 	github.com/jackc/pgx/v5 v5.7.6
 	github.com/joho/godotenv v1.5.1
