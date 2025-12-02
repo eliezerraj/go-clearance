@@ -1,0 +1,331 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform:
+- AWS::Serverless-2016-10-31
+Description: Apigateway Public VPCLink2 Integration v3.3 (Authorizaer Cross Account)- 28/11/2025
+
+Parameters:
+  Versao:
+    Type: String
+    Default: 3.0
+  Env:
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+      - hml
+      - prd
+  VpcLinkIdEks01:
+    Type: String
+    Default: qarnsq
+  PublicApiLogFormat:
+    Type: String
+    Default: '{"apiId": "$context.apiId", "requestId": "$context.requestId",
+      "sourceIP": "$context.identity.sourceIp", "userAgent": "$context.identity.userAgent",
+      "WAFresponse": "$context.wafResponseCode", "httpMethod": "$context.httpMethod",
+      "path": "$context.path", "respTime":"$context.integrationLatency", "responseCode":
+      "$context.status", "integRespCode": "$context.integrationStatus", "reqTime":"$context.requestTimeEpoch",
+      "resourcePath": "$context.resourcePath", "appClient": "$context.authorizer.principalId", "jwtId": "$context.authorizer.jwt_id",
+      "authLatency": "$context.authorizer.latency","x_amzn_trace_id": "$context.xrayTraceId"}'
+  ApiPublicName:
+    Type: String
+    Default: go-clearance-pub
+  ApiPublicLogGroupName:
+    Type: String
+    Description: Name of API Gateway Log Group
+    Default: /dock/apigateway/go-clearance
+  ApiGatewayDomainName:
+    Type: String
+    Default: go-api-clearance.architecturedev.caradhras.io
+  AuthorizerUri:
+    Type: String
+    Default: arn:aws:apigateway:us-east-2:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-2:908671954593:function:go-oauth-apigw-authorizer-lambda:live/invocations
+  AuthorizerARN:
+    Type: String
+    Default: arn:aws:lambda:us-east-2:908671954593:function:go-oauth-apigw-authorizer-lambda:live
+  EdgeCertificateArn:
+    Type: String
+    Default: arn:aws:acm:us-east-1:992382474575:certificate/e88a6b0b-f7b6-401b-b9ef-c160b1ab03c2
+  RegionalCertificateArn:
+    Type: String
+    Default: arn:aws:acm:us-east-2:992382474575:certificate/6be53392-cd0e-46b2-98e9-d0d037abc90c
+  WafaclArn:
+    Type: String
+    Description: Association WAF in API ApiGateway
+    Default: arn:aws:wafv2:us-east-2:992382474575:regional/webacl/FMManagedWebACLV2-acl-basic-1707615568671/e379af00-7aa0-48a9-a100-464c5a4f5873
+  Application:
+    Type: String
+    Default: go-clearance
+  Owner:
+    Type: String
+    Default: architecture
+  Service:
+    Type: String
+    Default: go-clearance
+  Squad:
+    Type: String
+    Default: architecture
+
+Mappings:
+  ApigwMap:
+    Clearance:
+      EndpointURL: go-clearance.architecturedev.caradhras.io
+
+Resources:
+  ApiPublicLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName:
+        Ref: ApiPublicLogGroupName
+      RetentionInDays: 7
+      Tags:
+      - Key: application
+        Value:
+          Ref: Application
+      - Key: env
+        Value:
+          Ref: Env
+      - Key: owner
+        Value:
+          Ref: Owner
+      - Key: resource
+        Value: log-group
+      - Key: service
+        Value:
+          Ref: Service
+      - Key: squad
+        Value:
+          Ref: Squad
+      - Key: stack
+        Value:
+          Fn::Sub: ${AWS::StackName}
+  
+  ApiPublicGoClearanceGateway:
+    Type: AWS::Serverless::Api
+    Properties:
+      BinaryMediaTypes:
+        - multipart/form-data  # Enable binary media type
+      AccessLogSetting:
+        DestinationArn:
+          Fn::GetAtt:
+          - ApiPublicLogGroup
+          - Arn
+        Format:
+          Ref: PublicApiLogFormat
+      AlwaysDeploy: true
+      DefinitionBody:
+        swagger: '2.0'
+        info:
+          title: go-clearance
+        tags:
+        - name: go-clearance
+          description: go-clearance
+        schemes:
+        - https
+        paths:
+          /{proxy+}:
+            get:
+              produces:
+              - application/json
+              responses:
+                '200':
+                  description: 200 response
+                  schema:
+                    $ref: '#/definitions/Empty'
+              x-amazon-apigateway-integration:
+                type: http_proxy
+                httpMethod: GET
+                connectionType: VPC_LINK
+                connectionId: !Ref VpcLinkIdEks01
+                integrationTarget: "arn:aws:elasticloadbalancing:us-east-2:992382474575:loadbalancer/app/k8s-testa-albarche-2e5ca49df0/ec0ab7280b7a6081"              
+                uri: 
+                  Fn::Sub:
+                  - 'https://${EksDomainName}/{proxy}'
+                  - EksDomainName: !FindInMap [ApigwMap, Clearance, EndpointURL]
+                passthroughBehavior: WHEN_NO_TEMPLATES
+                requestParameters:
+                  integration.request.path.proxy: method.request.path.proxy
+                  integration.request.header.X-Request-ID: context.requestId
+                  integration.request.header.client-id: context.authorizer.tenant_id
+                  integration.request.header.X-Forwarded-For: context.identity.sourceIp
+                  integration.request.header.jwt-id: context.authorizer.jwt_id  
+              security:
+              - authorizer: []
+            post:
+              consumes:
+              - application/json
+              produces:
+              - application/json
+              responses:
+                '200':
+                  description: 200 response
+                  schema:
+                    $ref: '#/definitions/Empty'
+              x-amazon-apigateway-integration:
+                type: http_proxy
+                httpMethod: POST
+                connectionType: VPC_LINK
+                connectionId: !Ref VpcLinkIdEks01
+                integrationTarget: "arn:aws:elasticloadbalancing:us-east-2:992382474575:loadbalancer/app/k8s-testa-albarche-2e5ca49df0/ec0ab7280b7a6081"           
+                uri: 
+                  Fn::Sub:
+                  - 'https://${EksDomainName}/{proxy}'
+                  - EksDomainName: !FindInMap [ApigwMap, Clearance, EndpointURL]
+                passthroughBehavior: WHEN_NO_TEMPLATES 
+                requestParameters:
+                  integration.request.path.proxy: method.request.path.proxy
+                  integration.request.header.X-Request-ID: context.requestId
+                  integration.request.header.client-id: context.authorizer.tenant_id
+                  integration.request.header.X-Forwarded-For: context.identity.sourceIp
+                  integration.request.header.jwt-id: context.authorizer.jwt_id   
+              security:
+              - authorizer: []
+            put:
+              consumes:
+              - application/json
+              produces:
+              - application/json
+              responses:
+                '200':
+                  description: 200 response
+                  schema:
+                    $ref: '#/definitions/Empty'
+              x-amazon-apigateway-integration:
+                type: http_proxy
+                httpMethod: PUT
+                connectionType: VPC_LINK
+                connectionId: !Ref VpcLinkIdEks01
+                integrationTarget: "arn:aws:elasticloadbalancing:us-east-2:992382474575:loadbalancer/app/k8s-testa-albarche-2e5ca49df0/ec0ab7280b7a6081"           
+                uri: 
+                  Fn::Sub:
+                  - 'https://${EksDomainName}/{proxy}'
+                  - EksDomainName: !FindInMap [ApigwMap, Clearance, EndpointURL]
+                passthroughBehavior: WHEN_NO_TEMPLATES 
+                requestParameters:
+                  integration.request.path.proxy: method.request.path.proxy
+                  integration.request.header.X-Request-ID: context.requestId
+                  integration.request.header.client-id: context.authorizer.tenant_id
+                  integration.request.header.X-Forwarded-For: context.identity.sourceIp
+                  integration.request.header.jwt-id: context.authorizer.jwt_id   
+              security:
+              - authorizer: []
+        x-amazon-apigateway-api-key-source: AUTHORIZER
+        securityDefinitions:
+          authorizer:
+            type: apiKey
+            name: Unused
+            in: header
+            x-amazon-apigateway-authtype: custom
+            x-amazon-apigateway-authorizer:
+              authorizerUri: !Ref AuthorizerUri
+              authorizerResultTtlInSeconds: 600
+              identitySource: method.request.header.Authorization, context.path, context.httpMethod, context.identity.sourceIp
+              type: request
+        definitions:
+          Empty:
+            type: object
+            title: Empty Schema
+        x-amazon-apigateway-gateway-responses:
+          UNAUTHORIZED:
+            statusCode: 401
+            responseTemplates:
+              application/json: '{"error": { "id": "$context.requestId", "description":
+                "Unauthorized", "code": "401"}}'
+          ACCESS_DENIED:
+            statusCode: 403
+            responseTemplates:
+              application/json: '{"error": { "id": "$context.requestId", "description":
+                "Forbidden", "code": "403"}}'
+          DEFAULT_4XX:
+            statusCode: 404
+            responseTemplates:
+              application/json: '{"error": { "id": "$context.requestId", "description":
+                "Resource not found", "code": "404"}}'
+          DEFAULT_5XX:
+            statusCode: 500
+            responseTemplates:
+              application/json: '{"error": { "id": "$context.requestId", "description":
+                "Internal Server Error", "code": "500"}}'
+          WAF_FILTERED:
+            statusCode: 403
+            responseTemplates:
+              application/json: '{"error": { "id": "$context.requestId", "description":
+                "Forbidden", "code": "403"}}'
+          THROTTLED:
+            statusCode: 429
+            responseTemplates:
+              application/json: '{"error": { "id": "$context.requestId", "description":
+                "Too many requests", "code": "429"}}'
+      Description: API Pulic Lambda Integration
+      DisableExecuteApiEndpoint: true
+      EndpointConfiguration:
+        Type: EDGE
+      MethodSettings:
+      - ResourcePath: /*
+        HttpMethod: '*'
+        MetricsEnabled: true
+        DataTraceEnabled: true
+        LoggingLevel: INFO
+      StageName: live
+      Tags:
+        application:
+          Ref: Application
+        env:
+          Ref: Env
+        owner:
+          Ref: Owner
+        resource: api-gateway
+        service:
+          Ref: Service
+        squad:
+          Ref: Squad
+        stack:
+          Fn::Sub: ${AWS::StackName}
+      TracingEnabled: true # xray enabled
+      Variables:
+        apiName:
+          Ref: ApiPublicName
+
+  ApiCustomDomainName:
+    Type: AWS::ApiGateway::DomainName
+    Properties:
+      DomainName:
+        Ref: ApiGatewayDomainName
+      EndpointConfiguration:
+        Types:
+        - EDGE
+      SecurityPolicy: TLS_1_2
+      CertificateArn:
+        Ref: EdgeCertificateArn
+
+  ApiPublicBaseMapping:
+    Type: AWS::ApiGateway::BasePathMapping
+    Properties:
+      DomainName:
+        Ref: ApiGatewayDomainName
+      RestApiId:
+        Ref: ApiPublicGoClearanceGateway
+      Stage:
+        Ref: ApiPublicGoClearanceGateway.Stage
+
+# Able the lines below if the Authorizer Lambda is in the same account as the API Gateway
+#  ApiInvokePermission:
+#    Type: 'AWS::Lambda::Permission'
+#    Properties:
+#      FunctionName: !Ref AuthorizerARN
+#      Action: lambda:InvokeFunction
+#      Principal: apigateway.amazonaws.com
+
+  WafAssociation:
+    Type: AWS::WAFv2::WebACLAssociation
+    Properties:
+      ResourceArn:
+        Fn::Sub: arn:aws:apigateway:${AWS::Region}::/restapis/${ApiPublicGoClearanceGateway}/stages/${ApiPublicGoClearanceGateway.Stage}
+      WebACLArn:
+        Ref: WafaclArn
+
+Outputs:
+  ApiPublicGoClearanceGateway:
+    Value:
+      Ref: ApiPublicGoClearanceGateway
+    Export:
+      Name: ApiPublicGoClearanceGateway
