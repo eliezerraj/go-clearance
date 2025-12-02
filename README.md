@@ -2,6 +2,12 @@
 
     workload for POC purpose
 
+    Create a work space (root)
+    go work init ./cmd ../go-core
+
+    Add module (inside /cmd)
+    go work use ..
+
 # tables
 
     CREATE TABLE public.clearance (
