@@ -193,9 +193,6 @@ func (s *WorkerService) AddPayment(ctx context.Context,
 	resPayload, err := s.doHttpCall(ctx, 
 									httpClientParameter)
 	if err != nil {
-		s.logger.Error().
-				Ctx(ctx).
-				Err(err).Send()
 		return nil, err
 	}
 
