@@ -18,7 +18,7 @@ data:
   DB_MAX_CONNECTION: "10"
   CTX_TIMEOUT: "5"
 
-  LOG_LEVEL: "info" #info, error, warning
+  LOG_LEVEL: "warning" #info, error, warning
   OTEL_EXPORTER_OTLP_ENDPOINT: "arch-eks-002-otel-collector.default.svc.cluster.local:4317"
 
   OTEL_METRICS: "false"

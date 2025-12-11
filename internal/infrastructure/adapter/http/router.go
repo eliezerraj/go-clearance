@@ -24,7 +24,6 @@ import (
 var (
 	coreMiddleWareApiError	go_core_midleware.APIError
 	coreMiddleWareWriteJSON	go_core_midleware.MiddleWare
-
 	tracerProvider go_core_otel_trace.TracerProvider
 )
 
