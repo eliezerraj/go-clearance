@@ -63,13 +63,13 @@ func (w *WorkerRepository) Stat(ctx context.Context) (go_core_db_pg.PoolStats){
 func (w* WorkerRepository) AddPayment(	ctx context.Context, 
 										tx pgx.Tx, 
 										payment *model.Payment) (*model.Payment, error){
-	// trace
-	ctx, span := tracerProvider.SpanCtx(ctx, "database.AddPayment")
-	defer span.End()
-
 	w.logger.Info().
 			Ctx(ctx).
 			Str("func","AddPayment").Send()
+
+	// trace
+	ctx, span := tracerProvider.SpanCtx(ctx, "database.AddPayment")
+	defer span.End()
 
 	conn, err := w.DatabasePG.Acquire(ctx)
 	if err != nil {
@@ -119,13 +119,13 @@ func (w* WorkerRepository) AddPayment(	ctx context.Context,
 // About get a cart_item
 func (w *WorkerRepository) GetPayment(	ctx context.Context,
 										payment *model.Payment) (*model.Payment, error) {
-	// trace
-	ctx, span := tracerProvider.SpanCtx(ctx, "database.GetPayment")
-	defer span.End()
-
 	w.logger.Info().
 			Ctx(ctx).
 			Str("func","GetPayment").Send()
+
+	// trace
+	ctx, span := tracerProvider.SpanCtx(ctx, "database.GetPayment")
+	defer span.End()
 
 	// db connection
 	conn, err := w.DatabasePG.Acquire(ctx)
@@ -212,13 +212,13 @@ func (w *WorkerRepository) GetPayment(	ctx context.Context,
 // About get a payment from an order
 func (w *WorkerRepository) GetPaymentFromOrder(	ctx context.Context,
 												order *model.Order) (*[]model.Payment, error) {
-	// trace
-	ctx, span := tracerProvider.SpanCtx(ctx, "database.GetPaymentFromOrder")
-	defer span.End()
-
 	w.logger.Info().
 			Ctx(ctx).
 			Str("func","GetPaymentFromOrder").Send()
+			
+	// trace
+	ctx, span := tracerProvider.SpanCtx(ctx, "database.GetPaymentFromOrder")
+	defer span.End()
 
 	// db connection
 	conn, err := w.DatabasePG.Acquire(ctx)
