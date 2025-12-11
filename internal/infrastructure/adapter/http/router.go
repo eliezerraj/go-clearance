@@ -121,14 +121,14 @@ func (h *HttpRouters) Info(rw http.ResponseWriter, req *http.Request) {
 										time.Duration(h.appServer.Server.CtxTimeout) * time.Second)
     defer cancel()
 
-	// trace	
-	ctx, span := tracerProvider.SpanCtx(ctx, "adapter.http.Info")
-	defer span.End()
-
 	// log with context
 	h.logger.Info().
 			Ctx(ctx).
 			Str("func","Info").Send()
+
+	// trace	
+	ctx, span := tracerProvider.SpanCtx(ctx, "adapter.http.Info")
+	defer span.End()
 
 	json.NewEncoder(rw).Encode(h.appServer)
 }
@@ -140,13 +140,13 @@ func (h *HttpRouters) AddPayment(rw http.ResponseWriter, req *http.Request) erro
 	ctx, cancel := context.WithTimeout(req.Context(), time.Duration(h.appServer.Server.CtxTimeout) * time.Second)
     defer cancel()
 
-	ctx, span := tracerProvider.SpanCtx(ctx, "adapter.http.AddPayment")
-	defer span.End()
-	
 	h.logger.Info().
 			Ctx(ctx).
 			Str("func","AddPayment").Send()
 
+	ctx, span := tracerProvider.SpanCtx(ctx, "adapter.http.AddPayment")
+	defer span.End()
+	
 	// decode payload		
 	payment := model.Payment{}
 	err := json.NewDecoder(req.Body).Decode(&payment)
@@ -172,12 +172,12 @@ func (h *HttpRouters) GetPayment(rw http.ResponseWriter, req *http.Request) erro
 	ctx, cancel := context.WithTimeout(req.Context(), time.Duration(h.appServer.Server.CtxTimeout) * time.Second)
     defer cancel()
 
-	ctx, span := tracerProvider.SpanCtx(ctx, "adapter.http.GetPayment")
-	defer span.End()
-
 	h.logger.Info().
 			Ctx(ctx).
 			Str("func","GetPayment").Send()
+
+	ctx, span := tracerProvider.SpanCtx(ctx, "adapter.http.GetPayment")
+	defer span.End()
 
 	// decode payload			
 	vars := mux.Vars(req)
@@ -206,13 +206,14 @@ func (h *HttpRouters) GetPaymentFromOrder(rw http.ResponseWriter, req *http.Requ
 	// trace and log
 	ctx, cancel := context.WithTimeout(req.Context(), time.Duration(h.appServer.Server.CtxTimeout) * time.Second)
     defer cancel()
-
-	ctx, span := tracerProvider.SpanCtx(ctx, "adapter.http.GetPaymentFromOrder")
-	defer span.End()
-
+	
 	h.logger.Info().
 			Ctx(ctx).
 			Str("func","GetPaymentFromOrder").Send()
+
+
+	ctx, span := tracerProvider.SpanCtx(ctx, "adapter.http.GetPaymentFromOrder")
+	defer span.End()
 
 	// decode payload			
 	vars := mux.Vars(req)
