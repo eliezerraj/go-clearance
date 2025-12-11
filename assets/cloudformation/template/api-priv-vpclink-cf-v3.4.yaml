@@ -1,0 +1,288 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform:
+- AWS::Serverless-2016-10-31
+Description: Apigateway Private VPCLink2 Integration v3.4 - 28/11/2025
+
+Parameters:
+  Versao:
+    Type: String
+    Default: 3.4
+  Env:
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+      - hml
+      - prd
+  PublicApiLogFormat:
+    Type: String
+    Default: '{"api": "$context.authorizer.apiName", "requestId": "$context.requestId",
+      "sourceIP": "$context.identity.sourceIp", "userAgent": "$context.identity.userAgent",
+      "WAFresponse": "$context.wafResponseCode", "httpMethod": "$context.httpMethod",
+      "path": "$context.path", "respTime":"$context.integrationLatency", "responseCode":
+      "$context.status", "integRespCode": "$context.integrationStatus", "reqTime":"$context.requestTimeEpoch",
+      "resourcePath": "$context.resourcePath", "apiId": "$context.apiId", "appClient":
+      "$context.authorizer.principalId", "jwtId": "$context.authorizer.jwt_id",
+      "authLatency": "$context.authorizer.latency"}'
+  ApiPrivateName:
+    Type: String
+    Default: api-go-clearance-pv
+  VPCEndpointId:
+    Type: String
+    Default: vpce-0cc0b1181b93539f0
+  ApiPublicLogGroupName:
+    Type: String
+    Description: Name of API Gateway Log Group
+    Default: /dock/apigateway/api-go-clearance-pv
+  WafaclArn:
+    Type: String
+    Description: Association WAF in API ApiGateway
+    Default: arn:aws:wafv2:us-east-2:992382474575:regional/webacl/FMManagedWebACLV2-acl-basic-1707615568671/e379af00-7aa0-48a9-a100-464c5a4f5873
+  EksDomainName:
+    Type: String
+    Description: EKS Domain name defined in ingress.yaml
+    Default: go-clearance.architecturedev.caradhras.io
+  EksVpcLinkId:
+    Type: String
+    Description: EKS VPC LinkID
+    Default: qarnsq  
+  Application:
+    Type: String
+    Default: api-go-clearance-pv
+  Owner:
+    Type: String
+    Default: architecture
+  Service:
+    Type: String
+    Default: api-go-clearance-pv
+  Squad:
+    Type: String
+    Default: architecture
+
+Conditions:
+  isPrd: !Equals [!Ref Env, prd]
+  isPrdOrQa:
+    'Fn::Or':
+      - 'Fn::Equals':
+          - !Ref Env
+          - prd
+      - 'Fn::Equals':
+          - !Ref Env
+          - qa
+
+Mappings:
+  Network:
+    dev:
+      Vpc: vpc-0df31a6e2d113d8b7
+    hml:
+      Vpc: vpc-053bf362926211174
+    prd:
+      Vpc: vpc-0fa3325d4843786ca,vpc-028b0a127e9669159
+
+Resources:
+  ApiPrivateLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName:
+        Ref: ApiPublicLogGroupName
+      RetentionInDays: 7
+      Tags:
+      - Key: application
+        Value:
+          Ref: Application
+      - Key: env
+        Value:
+          Ref: Env
+      - Key: owner
+        Value:
+          Ref: Owner
+      - Key: resource
+        Value: log-group
+      - Key: service
+        Value:
+          Ref: Service
+      - Key: squad
+        Value:
+          Ref: Squad
+      - Key: stack
+        Value:
+          Fn::Sub: ${AWS::StackName}
+  
+  ApiPrivateGateway:
+    Type: AWS::Serverless::Api
+    Properties:
+      AccessLogSetting:
+        DestinationArn:
+          Fn::GetAtt:
+          - ApiPrivateLogGroup
+          - Arn
+        Format:
+          Ref: PublicApiLogFormat
+      AlwaysDeploy: true
+      DefinitionBody:
+        swagger: '2.0'
+        info:
+          title: api-go-clearance-pv
+        tags:
+        - name: api-go-clearance-pv
+          description: api-go-clearance-pv
+        schemes:
+        - https
+        paths:
+          /{proxy+}:
+            get:
+              produces:
+              - application/json
+              responses:
+                '200':
+                  description: 200 response
+                  schema:
+                    $ref: '#/definitions/Empty'
+              x-amazon-apigateway-integration:
+                type: http_proxy
+                httpMethod: GET
+                connectionType: VPC_LINK
+                connectionId: !Ref EksVpcLinkId
+                integrationTarget: "arn:aws:elasticloadbalancing:us-east-2:992382474575:loadbalancer/app/k8s-testa-albarche-2e5ca49df0/ec0ab7280b7a6081"                                              
+                uri: 
+                  Fn::Sub: https://${EksDomainName}/{proxy}
+                passthroughBehavior: WHEN_NO_TEMPLATES
+                requestParameters:
+                  integration.request.path.proxy: method.request.path.proxy                  
+            post:
+              produces:
+              - application/json
+              responses:
+                '200':
+                  description: 200 response
+                  schema:
+                    $ref: '#/definitions/Empty'
+              x-amazon-apigateway-integration:
+                type: http_proxy
+                httpMethod: POST
+                connectionType: VPC_LINK
+                connectionId: !Ref EksVpcLinkId
+                integrationTarget: "arn:aws:elasticloadbalancing:us-east-2:992382474575:loadbalancer/app/k8s-testa-albarche-2e5ca49df0/ec0ab7280b7a6081"               
+                uri: 
+                  Fn::Sub: https://${EksDomainName}/{proxy}
+                passthroughBehavior: WHEN_NO_TEMPLATES
+                requestParameters:
+                  integration.request.path.proxy: method.request.path.proxy
+            put:
+              produces:
+              - application/json
+              responses:
+                '200':
+                  description: 200 response
+                  schema:
+                    $ref: '#/definitions/Empty'
+              x-amazon-apigateway-integration:
+                type: http_proxy
+                httpMethod: PUT
+                connectionType: VPC_LINK
+                connectionId: !Ref EksVpcLinkId
+                integrationTarget: "arn:aws:elasticloadbalancing:us-east-2:992382474575:loadbalancer/app/k8s-testa-albarche-2e5ca49df0/ec0ab7280b7a6081"               
+                uri: 
+                  Fn::Sub: https://${EksDomainName}/{proxy}
+                passthroughBehavior: WHEN_NO_TEMPLATES
+                requestParameters:
+                  integration.request.path.proxy: method.request.path.proxy
+        definitions:
+          Empty:
+            type: object
+            title: Empty Schema
+        x-amazon-apigateway-policy:
+          Version: "2012-10-17"
+          Statement:
+            - Effect: "Deny"
+              Principal: "*"
+              Action: "execute-api:Invoke"
+              Resource: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:*/*/*/*
+              Condition:
+                StringNotEquals:
+                  aws:sourceVpc: !If [ isPrdOrQa, !Split [",", !FindInMap [ Network, !Ref Env, Vpc] ], !FindInMap [ Network, !Ref Env, Vpc]]
+            - Effect: "Allow"
+              Principal: "*"
+              Action: "execute-api:Invoke"
+              Resource: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:*/*/*/*
+              Condition:
+                StringEquals:
+                  aws:sourceVpc: !If [ isPrdOrQa, !Split [",", !FindInMap [ Network, !Ref Env, Vpc] ], !FindInMap [ Network, !Ref Env, Vpc]]
+        x-amazon-apigateway-gateway-responses:
+          UNAUTHORIZED:
+            statusCode: 401
+            responseTemplates:
+              application/json: '{"error": { "id": "$context.requestId", "description":
+                "Unauthorized", "code": "401"}}'
+          ACCESS_DENIED:
+            statusCode: 403
+            responseTemplates:
+              application/json: '{"error": { "id": "$context.requestId", "description":
+                "Forbidden", "code": "403"}}'
+          DEFAULT_4XX:
+            statusCode: 404
+            responseTemplates:
+              application/json: '{"error": { "id": "$context.requestId", "description":
+                "Resource not found", "code": "404"}}'
+          DEFAULT_5XX:
+            statusCode: 500
+            responseTemplates:
+              application/json: '{"error": { "id": "$context.requestId", "description":
+                "Internal Server Error", "code": "500"}}'
+          WAF_FILTERED:
+            statusCode: 403
+            responseTemplates:
+              application/json: '{"error": { "id": "$context.requestId", "description":
+                "Forbidden", "code": "403"}}'
+          THROTTLED:
+            statusCode: 429
+            responseTemplates:
+              application/json: '{"error": { "id": "$context.requestId", "description":
+                "Too many requests", "code": "429"}}'
+      Description: !Sub "Api ${ApiPrivateName} service"
+      DisableExecuteApiEndpoint: false
+      EndpointConfiguration:
+        Type: PRIVATE
+        VPCEndpointIds:
+          - !Ref VPCEndpointId
+      MethodSettings:
+      - ResourcePath: /*
+        HttpMethod: '*'
+        MetricsEnabled: true
+        DataTraceEnabled: true
+        LoggingLevel: INFO
+      StageName: live
+      Tags:
+        application:
+          Ref: Application
+        env:
+          Ref: Env
+        owner:
+          Ref: Owner
+        resource: api-gateway
+        service:
+          Ref: Service
+        squad:
+          Ref: Squad
+        stack:
+          Fn::Sub: ${AWS::StackName}
+      TracingEnabled: true # xray enabled
+      Variables:
+        apiName:
+          Ref: ApiPrivateName
+
+  WafAssociation:
+    Type: AWS::WAFv2::WebACLAssociation
+    Properties:
+      ResourceArn:
+        Fn::Sub: arn:aws:apigateway:${AWS::Region}::/restapis/${ApiPrivateGateway}/stages/${ApiPrivateGateway.Stage}
+      WebACLArn:
+        Ref: WafaclArn
+        
+# Comment to avoid duplicity
+#Outputs:
+#  ApiPrivateGateway:
+#    Value:
+#      Ref: ApiPrivateGateway
+#    Export:
+#      Name: ApiPrivateGateway
