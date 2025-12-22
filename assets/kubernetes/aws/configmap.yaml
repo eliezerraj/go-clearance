@@ -21,9 +21,9 @@ data:
   LOG_LEVEL: "warning" #info, error, warning
   OTEL_EXPORTER_OTLP_ENDPOINT: "arch-eks-002-otel-collector.default.svc.cluster.local:4317"
 
-  OTEL_METRICS: "false"
+  OTEL_METRICS: "true"
   OTEL_STDOUT_TRACER: "false"
-  OTEL_TRACES: "false"
+  OTEL_TRACES: "true"
 
   OTEL_LOGS: "false"
   OTEL_STDOUT_LOG_GROUP: "false"
