@@ -100,3 +100,20 @@ spec:
                     values:
                       - spot
                       - on-demand
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app: *app-name
+          matchLabelKeys:
+          - pod-template-hash 
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: *app-name
+          matchLabelKeys:
+          - pod-template-hash 
