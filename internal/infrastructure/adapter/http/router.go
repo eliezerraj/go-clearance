@@ -151,14 +151,14 @@ func (h *HttpRouters) AddPayment(rw http.ResponseWriter, req *http.Request) erro
 	payment := model.Payment{}
 	err := json.NewDecoder(req.Body).Decode(&payment)
     if err != nil {
-		trace_id := fmt.Sprintf("%v",ctx.Value("trace-request-id"))
+		trace_id := fmt.Sprintf("%v",ctx.Value("request-id"))
 		return h.ErrorHandler(trace_id, erro.ErrBadRequest)
     }
 	defer req.Body.Close()
 
 	res, err := h.workerService.AddPayment(ctx, &payment)
 	if err != nil {
-		trace_id := fmt.Sprintf("%v",ctx.Value("trace-request-id"))
+		trace_id := fmt.Sprintf("%v",ctx.Value("request-id"))
 		return h.ErrorHandler(trace_id, err)
 	}
 	
@@ -185,7 +185,7 @@ func (h *HttpRouters) GetPayment(rw http.ResponseWriter, req *http.Request) erro
 
 	varIDint, err := strconv.Atoi(varID)
     if err != nil {
-		trace_id := fmt.Sprintf("%v",ctx.Value("trace-request-id"))
+		trace_id := fmt.Sprintf("%v",ctx.Value("request-id"))
 		return h.ErrorHandler(trace_id, erro.ErrBadRequest)
     }
 
@@ -193,7 +193,7 @@ func (h *HttpRouters) GetPayment(rw http.ResponseWriter, req *http.Request) erro
 
 	res, err := h.workerService.GetPayment(ctx, &payment)
 	if err != nil {
-		trace_id := fmt.Sprintf("%v",ctx.Value("trace-request-id"))
+		trace_id := fmt.Sprintf("%v",ctx.Value("request-id"))
 		return h.ErrorHandler(trace_id, err)
 	}
 	
@@ -221,7 +221,7 @@ func (h *HttpRouters) GetPaymentFromOrder(rw http.ResponseWriter, req *http.Requ
 
 	varIDint, err := strconv.Atoi(varID)
     if err != nil {
-		trace_id := fmt.Sprintf("%v",ctx.Value("trace-request-id"))
+		trace_id := fmt.Sprintf("%v",ctx.Value("request-id"))
 		return h.ErrorHandler(trace_id, erro.ErrBadRequest)
     }
 
@@ -229,7 +229,7 @@ func (h *HttpRouters) GetPaymentFromOrder(rw http.ResponseWriter, req *http.Requ
 
 	res, err := h.workerService.GetPaymentFromOrder(ctx, &order)
 	if err != nil {
-		trace_id := fmt.Sprintf("%v",ctx.Value("trace-request-id"))
+		trace_id := fmt.Sprintf("%v",ctx.Value("request-id"))
 		return h.ErrorHandler(trace_id, err)
 	}
 	
