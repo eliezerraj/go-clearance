@@ -175,7 +175,7 @@ func (s *WorkerService) AddPayment(ctx context.Context,
 
 	// get order details
 	// prepare headers http for calling services
-	trace_id := fmt.Sprintf("%v",ctx.Value("trace-request-id"))
+	trace_id := fmt.Sprintf("%v",ctx.Value("request-id"))
 
 	headers := map[string]string{
 		"Content-Type":  "application/json;charset=UTF-8",
@@ -297,7 +297,7 @@ func(s *WorkerService) ProducerEventKafka(ctx context.Context,
 	ctx, span := tracerProvider.SpanCtx(ctx, "service.ProducerEventKafka")
 	defer span.End()
 
-	trace_id := fmt.Sprintf("%v",ctx.Value("trace-request-id"))
+	trace_id := fmt.Sprintf("%v",ctx.Value("request-id"))
 
 	// create a mutex to avoid commit over a transaction on air
 	s.mutex.Lock()
@@ -322,7 +322,7 @@ func(s *WorkerService) ProducerEventKafka(ctx context.Context,
 		if err != nil {
 			return err
 		}
-		childLogger.Info().Interface("trace-request-id", trace_id ).Msg("success to recreate a new producer")*/
+		childLogger.Info().Interface("request-id", trace_id ).Msg("success to recreate a new producer")*/
 	}
 
 	// Prepare to event
@@ -338,7 +338,7 @@ func(s *WorkerService) ProducerEventKafka(ctx context.Context,
 	kafkaHeaders := []kafka.Header{}
 	appCarrier := KafkaHeaderCarrier{Headers: &kafkaHeaders}
 	otel.GetTextMapPropagator().Inject(ctx, appCarrier)
-	appCarrier.Set("trace-request-id", trace_id)
+	appCarrier.Set("request-id", trace_id)
 
 	s.logger.Printf("=========================================================")
     for _, h := range kafkaHeaders {
