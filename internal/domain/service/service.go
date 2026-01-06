@@ -265,7 +265,7 @@ func (s * WorkerService) GetPayment(ctx context.Context,
 	return resCart, nil
 }
 
-// About get payment
+// About get payment from given order
 func (s * WorkerService) GetPaymentFromOrder(ctx context.Context, 
 											order *model.Order) (*[]model.Payment, error){
 	s.logger.Info().
