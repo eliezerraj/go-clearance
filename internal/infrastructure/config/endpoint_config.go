@@ -54,7 +54,7 @@ func GetEndpointEnv() []model.Endpoint {
 	if os.Getenv("NAME_SERVICE_01") !=  "" {
 		endpoint01.Name = os.Getenv("NAME_SERVICE_01")
 	}
-	if os.Getenv("HOST_SERVICE_02") !=  "" {
+	if os.Getenv("HOST_SERVICE_01") !=  "" {
 		endpoint01.HostName = os.Getenv("HOST_SERVICE_01")
 	}
 	if os.Getenv("CLIENT_HTTP_TIMEOUT_01") !=  "" {
