@@ -1,21 +1,49 @@
 # go-clearance
 
-   This is workload for POC purpose such as load stress test, gitaction, etc.
+This is workload for POC purpose such as load stress test, gitaction, etc.
 
-   The main purpose is create an clearance for an order and send an event in kafka topic.
+The main purpose is create an clearance for an order and send an event in kafka topic.
 
-## Integration
+To local test you should use the work space:
+Create a work space (root)
 
-    This is workload requires go-order and a kafka cluster.
-
-    The integrations are made via http api request and event (producer).
-
-    To local test you should use the work space:
-    Create a work space (root)
     go work init ./cmd ../go-core
 
-    Add module (inside /cmd)
+Add module (inside /cmd)
+
     go work use ..
+
+## Sequence Diagram
+
+![alt text](clearance.png)
+
+    title clearance
+
+    participant user
+    participant clearance
+    participant order
+    participant kafka
+
+    entryspacing 1.1
+    alt addPayment
+        user->clearance:POST /clearance
+        postData
+    clearance->order:GET /order/{id}
+    clearance<--order:http 200 (JSON)\ngetData
+    clearance->clearance:create\nPayment
+    clearance->kafka:EVENT topic.clearance
+        user<--clearance:http 200 (JSON)\npostData
+        queryData
+    end
+    alt getPayment
+    user->clearance:GET /payment/{id}
+    user<--clearance:http 200 (JSON)\nqueryData
+    end
+    alt getPaymentFromOrder
+    user->clearance:GET /payment/order/{id}
+    user<--clearance:http 200 (JSON)\nqueryData
+    end
+
 
 ## Enviroment variables
 
@@ -63,11 +91,23 @@
 
 ## Enpoints
 
-    curl --location 'http://localhost:7003/info'
-    curl --location 'http://localhost:7003/payment/393'
-    curl --location 'http://localhost:7003/payment/order/6'
+curl --location 'http://localhost:7003/health'
 
-    curl --location 'http://localhost:7003/payment' \
+curl --location 'http://localhost:7003/live'
+
+curl --location 'http://localhost:7003/header'
+
+curl --location 'http://localhost:7003/context'
+
+curl --location 'http://localhost:7003/info'
+
+curl --location 'http://localhost:7003/metrics'
+
+curl --location 'http://localhost:7003/payment/393'
+
+curl --location 'http://localhost:7003/payment/order/6'
+
+curl --location 'http://localhost:7003/payment' \
     --data '{
         "transaction_id": "abc.123",
         "order": {
@@ -78,6 +118,20 @@
         "currency": "BRL",
         "amount": 500.00
     }'
+
+## Monitoring
+
+Logs: JSON structured logging via zerolog
+
+Metrics: Available through endpoint /metrics via otel/sdk/metric
+
+Trace: The x-request-id is extract from header and is ingest into context, in order the x-request-id do not exist a new one is generated (uuid)
+
+Errors: Structured error handling with custom error types
+
+## Security
+
+Security Headers: Is implement via go-core midleware
 
 # tables
 
