@@ -83,6 +83,7 @@ type Event struct{
 	ID			string		 `json:"event_id,omitempty"`
 	Type		string		 `json:"event_type,omitempty"`
 	EventAt		time.Time 	 `json:"event_date,omitempty"`
+	MetaData	interface {} `json:"event_metadata,omitempty"`
 	EventData	interface {} `json:"event_data,omitempty"`
 }
 
