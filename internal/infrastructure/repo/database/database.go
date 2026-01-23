@@ -10,6 +10,7 @@ import (
 
 		"github.com/go-clearance/shared/erro"
 		"github.com/go-clearance/internal/domain/model"
+		"go.opentelemetry.io/otel/trace"
 
 		go_core_otel_trace "github.com/eliezerraj/go-core/v2/otel/trace"
 		go_core_db_pg "github.com/eliezerraj/go-core/v2/database/postgre"
@@ -68,7 +69,7 @@ func (w* WorkerRepository) AddPayment(	ctx context.Context,
 			Str("func","AddPayment").Send()
 
 	// trace
-	ctx, span := tracerProvider.SpanCtx(ctx, "database.AddPayment")
+	ctx, span := tracerProvider.SpanCtx(ctx, "database.AddPayment", trace.SpanKindInternal)
 	defer span.End()
 
 	conn, err := w.DatabasePG.Acquire(ctx)
@@ -124,7 +125,7 @@ func (w *WorkerRepository) GetPayment(	ctx context.Context,
 			Str("func","GetPayment").Send()
 
 	// trace
-	ctx, span := tracerProvider.SpanCtx(ctx, "database.GetPayment")
+	ctx, span := tracerProvider.SpanCtx(ctx, "database.GetPayment", trace.SpanKindClient)
 	defer span.End()
 
 	// db connection
@@ -217,7 +218,7 @@ func (w *WorkerRepository) GetPaymentFromOrder(	ctx context.Context,
 			Str("func","GetPaymentFromOrder").Send()
 			
 	// trace
-	ctx, span := tracerProvider.SpanCtx(ctx, "database.GetPaymentFromOrder")
+	ctx, span := tracerProvider.SpanCtx(ctx, "database.GetPaymentFromOrder", trace.SpanKindClient)
 	defer span.End()
 
 	// db connection

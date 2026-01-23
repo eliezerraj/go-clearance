@@ -22,6 +22,8 @@ import (
 	go_core_otel_trace 	"github.com/eliezerraj/go-core/v2/otel/trace"
 
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/trace"
+	
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 )
 
@@ -124,11 +126,11 @@ func (s * WorkerService) HealthCheck(ctx context.Context) error {
 	s.logger.Info().
 			Str("func","HealthCheck").Send()
 
-	ctx, span := tracerProvider.SpanCtx(ctx, "service.HealthCheck")
+	ctx, span := tracerProvider.SpanCtx(ctx, "service.HealthCheck", trace.SpanKindServer)
 	defer span.End()
 
 	// Check database health
-	_, spanDB := tracerProvider.SpanCtx(ctx, "DatabasePG.Ping")
+	_, spanDB := tracerProvider.SpanCtx(ctx, "DatabasePG.Ping", trace.SpanKindServer)
 
 	err := s.workerRepository.DatabasePG.Ping()
 	if err != nil {
@@ -154,7 +156,7 @@ func (s *WorkerService) AddPayment(ctx context.Context,
 			Str("func","AddPayment").Send()
 
 	// trace and log
-	ctx, span := tracerProvider.SpanCtx(ctx, "service.AddPayment")
+	ctx, span := tracerProvider.SpanCtx(ctx, "service.AddPayment", trace.SpanKindServer)
 
 	// prepare database
 	tx, conn, err := s.workerRepository.DatabasePG.StartTx(ctx)
@@ -253,7 +255,7 @@ func (s * WorkerService) GetPayment(ctx context.Context,
 			Str("func","GetPayment").Send()
 
 	// trace and log
-	ctx, span := tracerProvider.SpanCtx(ctx, "service.GetPayment")
+	ctx, span := tracerProvider.SpanCtx(ctx, "service.GetPayment", trace.SpanKindServer)
 	defer span.End()
 
 	// Call a service
@@ -273,7 +275,7 @@ func (s * WorkerService) GetPaymentFromOrder(ctx context.Context,
 			Str("func","GetPaymentFromOrder").Send()
 
 	// trace and log
-	ctx, span := tracerProvider.SpanCtx(ctx, "service.GetPaymentFromOrder")
+	ctx, span := tracerProvider.SpanCtx(ctx, "service.GetPaymentFromOrder", trace.SpanKindServer)
 	defer span.End()
 
 	// Call a service
@@ -294,7 +296,7 @@ func(s *WorkerService) ProducerEventKafka(ctx context.Context,
 			Str("func","ProducerEventKafka").Send()
 			
 	// trace and log
-	ctx, span := tracerProvider.SpanCtx(ctx, "service.ProducerEventKafka")
+	ctx, span := tracerProvider.SpanCtx(ctx, "service.ProducerEventKafka", trace.SpanKindProducer)
 	defer span.End()
 
 	trace_id := fmt.Sprintf("%v",ctx.Value("request-id"))

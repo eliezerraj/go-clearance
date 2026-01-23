@@ -16,7 +16,8 @@ import (
 	"github.com/go-clearance/shared/erro"
 	"github.com/go-clearance/internal/domain/model"
 	"github.com/go-clearance/internal/domain/service"
-
+	"go.opentelemetry.io/otel/trace"
+	
 	go_core_midleware "github.com/eliezerraj/go-core/v2/middleware"
 	go_core_otel_trace "github.com/eliezerraj/go-core/v2/otel/trace"
 )
@@ -127,7 +128,7 @@ func (h *HttpRouters) Info(rw http.ResponseWriter, req *http.Request) {
 			Str("func","Info").Send()
 
 	// trace	
-	ctx, span := tracerProvider.SpanCtx(ctx, "adapter.http.Info")
+	ctx, span := tracerProvider.SpanCtx(ctx, "adapter.Info", trace.SpanKindInternal)
 	defer span.End()
 
 	json.NewEncoder(rw).Encode(h.appServer)
@@ -144,7 +145,7 @@ func (h *HttpRouters) AddPayment(rw http.ResponseWriter, req *http.Request) erro
 			Ctx(ctx).
 			Str("func","AddPayment").Send()
 
-	ctx, span := tracerProvider.SpanCtx(ctx, "adapter.http.AddPayment")
+	ctx, span := tracerProvider.SpanCtx(ctx, "adapter.AddPayment", trace.SpanKindInternal)
 	defer span.End()
 	
 	// decode payload		
@@ -176,7 +177,7 @@ func (h *HttpRouters) GetPayment(rw http.ResponseWriter, req *http.Request) erro
 			Ctx(ctx).
 			Str("func","GetPayment").Send()
 
-	ctx, span := tracerProvider.SpanCtx(ctx, "adapter.http.GetPayment")
+	ctx, span := tracerProvider.SpanCtx(ctx, "adapter.GetPayment", trace.SpanKindInternal)
 	defer span.End()
 
 	// decode payload			
@@ -212,7 +213,7 @@ func (h *HttpRouters) GetPaymentFromOrder(rw http.ResponseWriter, req *http.Requ
 			Str("func","GetPaymentFromOrder").Send()
 
 
-	ctx, span := tracerProvider.SpanCtx(ctx, "adapter.http.GetPaymentFromOrder")
+	ctx, span := tracerProvider.SpanCtx(ctx, "adapter.GetPaymentFromOrder", trace.SpanKindInternal)
 	defer span.End()
 
 	// decode payload			
