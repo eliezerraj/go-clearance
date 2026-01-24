@@ -5,7 +5,6 @@ import (
 	"time"
 	"context"
 	"sync"
-	"errors"
 	"net/http"
 	"encoding/json"
 
@@ -20,6 +19,7 @@ import (
 	go_core_http 		"github.com/eliezerraj/go-core/v2/http"
 	go_core_db_pg 		"github.com/eliezerraj/go-core/v2/database/postgre"
 	go_core_otel_trace 	"github.com/eliezerraj/go-core/v2/otel/trace"
+	go_core_midleware "github.com/eliezerraj/go-core/v2/middleware"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/trace"
@@ -27,21 +27,66 @@ import (
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 )
 
-var tracerProvider go_core_otel_trace.TracerProvider
-
 type WorkerService struct {
-	appServer			*model.AppServer
-	workerRepository	*database.WorkerRepository
+	workerRepository 	*database.WorkerRepository
 	logger 				*zerolog.Logger
-	workerEvent			*event.WorkerEvent
+	tracerProvider 		*go_core_otel_trace.TracerProvider
 	httpService			*go_core_http.HttpService
-	mutex    				sync.Mutex 	 	
+	endpoint			*[]model.Endpoint
+	workerEvent			*event.WorkerEvent	
+	mutex    			sync.Mutex 	 	
+}
+
+// About new worker service
+func NewWorkerService(	workerRepository *database.WorkerRepository, 
+						appLogger 		*zerolog.Logger,
+						tracerProvider 	*go_core_otel_trace.TracerProvider,
+						endpoint		*[]model.Endpoint, 
+					  	workerEvent		*event.WorkerEvent) *WorkerService {
+
+	logger := appLogger.With().
+						Str("package", "domain.service").
+						Logger()
+	logger.Info().
+			Str("func","NewWorkerService").Send()
+
+	httpService := go_core_http.NewHttpService(&logger)					
+
+	return &WorkerService{
+		workerRepository: workerRepository,
+		logger: &logger,
+		tracerProvider: tracerProvider,
+		httpService: httpService,
+		endpoint: endpoint,
+		workerEvent: workerEvent,
+	}
+}
+
+// Helper: Get service endpoint by index with error handling
+func (s *WorkerService) getServiceEndpoint(index int) (*model.Endpoint, error) {
+	if s.endpoint == nil || len(*s.endpoint) <= index {
+		return nil, fmt.Errorf("service endpoint at index %d not found", index)
+	}
+	return &(*s.endpoint)[index], nil
+}
+
+// Helper: Build HTTP headers with request ID
+func (s *WorkerService) buildHeaders(ctx context.Context) map[string]string {
+	requestID := go_core_midleware.GetRequestID(ctx)
+	return map[string]string{
+		"Content-Type":  "application/json;charset=UTF-8",
+		"X-Request-Id":  requestID,
+	}
 }
 
 // about do http call 
 func (s *WorkerService) doHttpCall(ctx context.Context,
 									httpClientParameter go_core_http.HttpClientParameter) (interface{},error) {
-		
+
+	s.logger.Info().
+			 Ctx(ctx).
+			 Str("func","doHttpCall").Send()
+
 	resPayload, statusCode, err := s.httpService.DoHttp(ctx, 
 														httpClientParameter)
 	if err != nil {
@@ -50,26 +95,30 @@ func (s *WorkerService) doHttpCall(ctx context.Context,
 				Err(err).Send()
 		return nil, err
 	}
-
 	if statusCode != http.StatusOK {
 		if statusCode == http.StatusNotFound {
-			s.logger.Error().
-					Ctx(ctx).
-					Err(erro.ErrNotFound).Send()
+			s.logger.Warn().
+					 Ctx(ctx).
+					 Err(erro.ErrNotFound).Send()
 			return nil, erro.ErrNotFound
 		} else {		
-			jsonString, err  := json.Marshal(resPayload)
+			jsonString, err := json.Marshal(resPayload)
 			if err != nil {
 				s.logger.Error().
 						Ctx(ctx).
 						Err(err).Send()
-				return nil, errors.New(err.Error())
+				return nil, fmt.Errorf("FAILED to marshal http response: %w", err)
 			}			
 			
 			message := model.APIError{}
-			json.Unmarshal(jsonString, &message)
+			if err := json.Unmarshal(jsonString, &message); err != nil {
+				s.logger.Error().
+						Ctx(ctx).
+						Err(err).Send()
+				return nil, fmt.Errorf("FAILED to unmarshal error response: %w", err)
+			}
 
-			newErr := errors.New(fmt.Sprintf("http call error: status code %d - message: %s", message.StatusCode ,message.Msg))
+			newErr := fmt.Errorf("http call error: status code %d - message: %s", statusCode, message.Msg)
 			s.logger.Error().
 					Ctx(ctx).
 					Err(newErr).Send()
@@ -99,68 +148,65 @@ func (s *WorkerService) Stat(ctx context.Context) (go_core_db_pg.PoolStats){
 	return s.workerRepository.Stat(ctx)
 }
 
-// About new worker service
-func NewWorkerService(appServer	*model.AppServer,
-					  workerRepository *database.WorkerRepository, 
-					  workerEvent	*event.WorkerEvent,
-					  appLogger *zerolog.Logger) *WorkerService {
-	logger := appLogger.With().
-						Str("package", "domain.service").
-						Logger()
-	logger.Info().
-			Str("func","NewWorkerService").Send()
-
-	httpService := go_core_http.NewHttpService(&logger)					
-
-	return &WorkerService{
-		appServer: appServer,
-		workerRepository: workerRepository,
-		logger: &logger,
-		workerEvent: workerEvent,
-		httpService: httpService,
-	}
-}
-
 // About check health service
 func (s * WorkerService) HealthCheck(ctx context.Context) error {
 	s.logger.Info().
 			Str("func","HealthCheck").Send()
 
-	ctx, span := tracerProvider.SpanCtx(ctx, "service.HealthCheck", trace.SpanKindServer)
+	ctx, span := s.tracerProvider.SpanCtx(ctx, "service.HealthCheck", trace.SpanKindServer)
 	defer span.End()
 
 	// Check database health
-	_, spanDB := tracerProvider.SpanCtx(ctx, "DatabasePG.Ping", trace.SpanKindServer)
-
+	ctx, spanDB := s.tracerProvider.SpanCtx(ctx, "DatabasePG.Ping", trace.SpanKindInternal)
 	err := s.workerRepository.DatabasePG.Ping()
+	spanDB.End()
+
 	if err != nil {
 		s.logger.Error().
+				Ctx(ctx).
 				Err(err).Msg("*** Database HEALTH CHECK FAILED ***")
 		return erro.ErrHealthCheck
 	}
 
-	spanDB.End()
-	
 	s.logger.Info().
-			Str("func","HealthCheck").
+			Ctx(ctx).
 			Msg("*** Database HEALTH CHECK SUCCESSFULL ***")
 
 	return nil
+}
+
+// Helper: Parse order from HTTP response payload
+func (s *WorkerService) parseOrderFromPayload(ctx context.Context, payload interface{}) (*model.Order, error) {
+	jsonString, err := json.Marshal(payload)
+	if err != nil {
+		s.logger.Error().Ctx(ctx).Err(err).Send()
+		return nil, fmt.Errorf("FAILED to marshal response payload: %w", err)
+	}
+	
+	order := &model.Order{}
+	if err := json.Unmarshal(jsonString, order); err != nil {
+		s.logger.Error().Ctx(ctx).Err(err).Send()
+		return nil, fmt.Errorf("FAILED to unmarshal order: %w", err)
+	}
+	return order, nil
 }
 
 // About create a payment
 func (s *WorkerService) AddPayment(ctx context.Context, 
 									payment *model.Payment) (*model.Payment, error){
 	s.logger.Info().
-			Ctx(ctx).
-			Str("func","AddPayment").Send()
+		Ctx(ctx).
+		Str("func","AddPayment").Send()
 
 	// trace and log
-	ctx, span := tracerProvider.SpanCtx(ctx, "service.AddPayment", trace.SpanKindServer)
+	ctx, span := s.tracerProvider.SpanCtx(ctx, "service.AddPayment", trace.SpanKindServer)
 
 	// prepare database
 	tx, conn, err := s.workerRepository.DatabasePG.StartTx(ctx)
 	if err != nil {
+		s.logger.Error().
+			Ctx(ctx).
+			Err(err).Send()
 		return nil, err
 	}
 
@@ -175,9 +221,33 @@ func (s *WorkerService) AddPayment(ctx context.Context,
 		span.End()
 	}()
 
+	endpoint, err := s.getServiceEndpoint(0)
+	if err != nil {
+		return nil, err
+	}
+
+	headers := s.buildHeaders(ctx)
+	httpClientParameter := go_core_http.HttpClientParameter {
+		Url:  fmt.Sprintf("%s%s%v", endpoint.Url, "/order/", payment.Order.ID),
+		Method: "GET",
+		Timeout: endpoint.HttpTimeout,
+		Headers: &headers,
+	}
+
+	// call a service via http
+	resPayload, err := s.doHttpCall(ctx, httpClientParameter)
+	if err != nil {
+		return nil, err
+	}
+
+	order, err := s.parseOrderFromPayload(ctx, resPayload)
+	if err != nil {
+		return nil, err
+	}
+
 	// get order details
 	// prepare headers http for calling services
-	trace_id := fmt.Sprintf("%v",ctx.Value("request-id"))
+	/*trace_id := fmt.Sprintf("%v",ctx.Value("request-id"))
 
 	headers := map[string]string{
 		"Content-Type":  "application/json;charset=UTF-8",
@@ -207,12 +277,12 @@ func (s *WorkerService) AddPayment(ctx context.Context,
 		return nil, errors.New(err.Error())
 	}
 	order := model.Order{}
-	json.Unmarshal(jsonString, &order)
+	json.Unmarshal(jsonString, &order)*/
 
 	// prepare data
 	now := time.Now()
 	payment.CreatedAt = now
-	payment.Order = &order
+	payment.Order = order
 
 	// Create payment
 	resPayment, err := s.workerRepository.AddPayment(ctx, tx, payment)
@@ -255,7 +325,7 @@ func (s * WorkerService) GetPayment(ctx context.Context,
 			Str("func","GetPayment").Send()
 
 	// trace and log
-	ctx, span := tracerProvider.SpanCtx(ctx, "service.GetPayment", trace.SpanKindServer)
+	ctx, span := s.tracerProvider.SpanCtx(ctx, "service.GetPayment", trace.SpanKindServer)
 	defer span.End()
 
 	// Call a service
@@ -275,7 +345,7 @@ func (s * WorkerService) GetPaymentFromOrder(ctx context.Context,
 			Str("func","GetPaymentFromOrder").Send()
 
 	// trace and log
-	ctx, span := tracerProvider.SpanCtx(ctx, "service.GetPaymentFromOrder", trace.SpanKindServer)
+	ctx, span := s.tracerProvider.SpanCtx(ctx, "service.GetPaymentFromOrder", trace.SpanKindServer)
 	defer span.End()
 
 	// Call a service
@@ -296,7 +366,7 @@ func(s *WorkerService) ProducerEventKafka(ctx context.Context,
 			Str("func","ProducerEventKafka").Send()
 			
 	// trace and log
-	ctx, span := tracerProvider.SpanCtx(ctx, "service.ProducerEventKafka", trace.SpanKindProducer)
+	ctx, span := s.tracerProvider.SpanCtx(ctx, "service.ProducerEventKafka", trace.SpanKindProducer)
 	defer span.End()
 
 	trace_id := fmt.Sprintf("%v",ctx.Value("request-id"))
@@ -313,7 +383,7 @@ func(s *WorkerService) ProducerEventKafka(ctx context.Context,
 	if err != nil {
 		s.logger.Error().
 				Ctx(ctx).
-				Err(err).Msg("failed to kafka BeginTransaction")
+				Err(err).Msg("FAILED to kafka BeginTransaction")
 
 		// Create a new producer and start a transaction
 		/*err = s.workerEvent.DestroyWorkerEventProducerTx(ctx)
@@ -366,7 +436,7 @@ func(s *WorkerService) ProducerEventKafka(ctx context.Context,
 		if err_msk != nil {
 			s.logger.Error().
 					Ctx(ctx).
-					Err(err).Msg("failed to kafka AbortTransaction")
+					Err(err).Msg("FAILED to kafka AbortTransaction")
 			return err_msk
 		}
 		return err
@@ -380,14 +450,14 @@ func(s *WorkerService) ProducerEventKafka(ctx context.Context,
 		s.logger.Error().
 				Ctx(ctx).
 				Err(err).
-				Msg("Failed to Kafka CommitTransaction = KAFKA ROLLBACK COMMIT !!!")
+				Msg("FAILED to Kafka CommitTransaction = KAFKA ROLLBACK COMMIT !!!")
 
 		errMskAbort := s.workerEvent.ProducerWorker.AbortTransaction(ctx)
 		if errMskAbort != nil {
 			s.logger.Error().
 				Ctx(ctx).
 				Err(errMskAbort).
-				Msg("failed to kafka AbortTransaction during CommitTransaction")
+				Msg("FAILED to kafka AbortTransaction during CommitTransaction")
 			return errMskAbort
 		}
 		return err

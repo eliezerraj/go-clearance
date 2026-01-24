@@ -4,9 +4,9 @@
 package log
 
 import(
-	"fmt"
 	"github.com/rs/zerolog"
 	"go.opentelemetry.io/otel/trace"
+	go_core_midleware "github.com/eliezerraj/go-core/v2/middleware"
 )
 
 type TraceHook struct{}
@@ -14,11 +14,10 @@ type TraceHook struct{}
 func (h TraceHook) Run(e *zerolog.Event, level zerolog.Level, msg string) {
 	ctx := e.GetCtx() 
 
-	requestId := fmt.Sprintf("%v",ctx.Value("request-id"))
-	
-	if requestId != "<nil>"{
-		e = e.Str("request-id", requestId)
-	}
+    requestID := go_core_midleware.GetRequestID(ctx)
+    if requestID != "" {
+        e = e.Str("request-id", requestID)
+    } 
 
 	spanCtx := trace.SpanContextFromContext(ctx)
 	if spanCtx.IsValid() {

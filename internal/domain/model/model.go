@@ -13,7 +13,7 @@ type AppServer struct {
 	EnvTrace			*go_core_otel_trace.EnvTrace	`json:"env_trace"`
 	DatabaseConfig		*go_core_db_pg.DatabaseConfig  	`json:"database_config"`
 	KafkaConfigurations	*go_core_event.KafkaConfigurations  `json:"kafka_configurations"`
-	Topics 				[]string						`json:"topics"`
+	Topics 				*[]string						`json:"topics"`
 	Endpoint 			*[]Endpoint						`json:"endpoints"`
 }
 

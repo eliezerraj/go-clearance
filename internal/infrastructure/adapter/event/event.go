@@ -22,10 +22,11 @@ type WorkerEvent struct {
 }
 
 // About create a worker producer kafka with transaction
-func NewWorkerEventTX(ctx context.Context, 
+func NewWorkerEventTX(ctx 	context.Context, 
 					 topics []string, 
-					 kafkaConfigurations *go_core_event.KafkaConfigurations,
-					 appLogger *zerolog.Logger) (*WorkerEvent, error) {
+					 kafkaCfgs 	*go_core_event.KafkaConfigurations,
+					 appLogger 	*zerolog.Logger) (*WorkerEvent, error) {
+	
 	logger := appLogger.With().
 						Str("component", "adapter.event").
 						Logger()
@@ -33,7 +34,7 @@ func NewWorkerEventTX(ctx context.Context,
 			Ctx(ctx).
 			Str("func","NewWorkerEventTX").Send()
 
-	producerWorker, err := go_core_event.NewProducerWorkerTX(kafkaConfigurations,
+	producerWorker, err := go_core_event.NewProducerWorkerTX(kafkaCfgs,
 															appLogger)
 	if err != nil {
 		logger.Error().
@@ -54,12 +55,12 @@ func NewWorkerEventTX(ctx context.Context,
 	return &WorkerEvent{
 		Topics: topics,
 		ProducerWorker: producerWorker,
-		KafkaConfigurations: kafkaConfigurations,
+		KafkaConfigurations: kafkaCfgs,
 		logger: &logger,
 	},nil
 }
 
-// Above destroy ans create a new producer in case of failed abort
+// Above destroy ans create a new producer in case of FAILED abort
 func (w *WorkerEvent) DestroyWorkerEventProducerTx(ctx context.Context) (error) {
 	w.logger.Info().
 			Ctx(ctx).

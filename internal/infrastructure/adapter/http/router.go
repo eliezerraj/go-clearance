@@ -22,32 +22,45 @@ import (
 	go_core_otel_trace "github.com/eliezerraj/go-core/v2/otel/trace"
 )
 
+// Global middleware reference for error handling
 var (
-	coreMiddleWareApiError	go_core_midleware.APIError
-	coreMiddleWareWriteJSON	go_core_midleware.MiddleWare
-	tracerProvider go_core_otel_trace.TracerProvider
+	_ go_core_midleware.MiddleWare
 )
 
 type HttpRouters struct {
 	workerService 	*service.WorkerService
 	appServer		*model.AppServer
 	logger			*zerolog.Logger
+	tracerProvider 	*go_core_otel_trace.TracerProvider
 }
 
-// Type for async result
-type result struct {
-		data interface{}
-		err  error
+// Helper to extract context with timeout and setup span
+func (h *HttpRouters) withContext(req *http.Request, spanName string) (context.Context, context.CancelFunc, trace.Span) {
+	ctx, cancel := context.WithTimeout(req.Context(), 
+		time.Duration(h.appServer.Server.CtxTimeout) * time.Second)
+	
+	h.logger.Info().
+			Ctx(ctx).
+			Str("func", spanName).Send()
+	
+	ctx, span := h.tracerProvider.SpanCtx(ctx, "adapter."+spanName, trace.SpanKindInternal)
+	return ctx, cancel, span
+}
+
+// Helper to get trace ID from context using middleware function
+func (h *HttpRouters) getTraceID(ctx context.Context) string {
+	return go_core_midleware.GetRequestID(ctx)
 }
 
 // Above create routers
 func NewHttpRouters(appServer *model.AppServer,
 					workerService *service.WorkerService,
-					appLogger *zerolog.Logger) HttpRouters {
+					appLogger *zerolog.Logger,
+					tracerProvider *go_core_otel_trace.TracerProvider) HttpRouters {
 	logger := appLogger.With().
 						Str("package", "adapter.http").
 						Logger()
-
+			
 	logger.Info().
 			Str("func","NewHttpRouters").Send()
 
@@ -55,45 +68,65 @@ func NewHttpRouters(appServer *model.AppServer,
 		workerService: workerService,
 		appServer: appServer,
 		logger: &logger,
+		tracerProvider: tracerProvider,
 	}
 }
 
-// About handle error
-func (h *HttpRouters) ErrorHandler(trace_id string, err error) *go_core_midleware.APIError {
+// Helper to write JSON response
+func (h *HttpRouters) writeJSON(w http.ResponseWriter, code int, data interface{}) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
 
+	return json.NewEncoder(w).Encode(data)
+}
+
+// Helper to parse ID parameter from URL variables
+func (h *HttpRouters) parseIDParam(vars map[string]string) (int, error) {
+	varID := vars["id"]
+	varIDint, err := strconv.Atoi(varID)
+	if err != nil {
+		return 0, erro.ErrBadRequest
+	}
+	return varIDint, nil
+}
+
+// ErrorHandler creates an APIError with appropriate HTTP status based on error type
+func (h *HttpRouters) ErrorHandler(traceID string, err error) *go_core_midleware.APIError {
 	var httpStatusCode int = http.StatusInternalServerError
 
 	if strings.Contains(err.Error(), "context deadline exceeded") {
-    	httpStatusCode = http.StatusGatewayTimeout
+		httpStatusCode = http.StatusGatewayTimeout
 	}
 
 	if strings.Contains(err.Error(), "check parameters") {
-    	httpStatusCode = http.StatusBadRequest
+		httpStatusCode = http.StatusBadRequest
 	}
 
 	if strings.Contains(err.Error(), "not found") {
-    	httpStatusCode = http.StatusNotFound
+		httpStatusCode = http.StatusNotFound
 	}
 
 	if strings.Contains(err.Error(), "duplicate key") || 
 	   strings.Contains(err.Error(), "unique constraint") {
-   		httpStatusCode = http.StatusBadRequest
+		httpStatusCode = http.StatusBadRequest
 	}
 
-	coreMiddleWareApiError = coreMiddleWareApiError.NewAPIError(err, 
-																trace_id, 
-																httpStatusCode)
-
-	return &coreMiddleWareApiError
+	return go_core_midleware.NewAPIError(err, traceID, httpStatusCode)
 }
 
 // About return a health
 func (h *HttpRouters) Health(rw http.ResponseWriter, req *http.Request) {
+	rw.Header().Set("Content-Type", "application/json")
+	rw.WriteHeader(http.StatusOK)
+
 	json.NewEncoder(rw).Encode(model.MessageRouter{Message: "true"})
 }
 
 // About return a live
 func (h *HttpRouters) Live(rw http.ResponseWriter, req *http.Request) {
+	rw.Header().Set("Content-Type", "application/json")
+	rw.WriteHeader(http.StatusOK)
+
 	json.NewEncoder(rw).Encode(model.MessageRouter{Message: "true"})
 }
 
@@ -117,18 +150,11 @@ func (h *HttpRouters) Context(rw http.ResponseWriter, req *http.Request) {
 
 // About info
 func (h *HttpRouters) Info(rw http.ResponseWriter, req *http.Request) {
-	// extract context		
-	ctx, cancel := context.WithTimeout(req.Context(), 
-										time.Duration(h.appServer.Server.CtxTimeout) * time.Second)
-    defer cancel()
-
-	// log with context
-	h.logger.Info().
-			Ctx(ctx).
-			Str("func","Info").Send()
-
-	// trace	
-	ctx, span := tracerProvider.SpanCtx(ctx, "adapter.Info", trace.SpanKindInternal)
+	rw.Header().Set("Content-Type", "application/json")
+	rw.WriteHeader(http.StatusOK)
+	
+	_, cancel, span := h.withContext(req, "Info")
+	defer cancel()
 	defer span.End()
 
 	json.NewEncoder(rw).Encode(h.appServer)
@@ -136,103 +162,69 @@ func (h *HttpRouters) Info(rw http.ResponseWriter, req *http.Request) {
 
 // About add payment
 func (h *HttpRouters) AddPayment(rw http.ResponseWriter, req *http.Request) error {
-	
-	// trace and log
-	ctx, cancel := context.WithTimeout(req.Context(), time.Duration(h.appServer.Server.CtxTimeout) * time.Second)
-    defer cancel()
-
-	h.logger.Info().
-			Ctx(ctx).
-			Str("func","AddPayment").Send()
-
-	ctx, span := tracerProvider.SpanCtx(ctx, "adapter.AddPayment", trace.SpanKindInternal)
+	ctx, cancel, span := h.withContext(req, "AddPayment")
+	defer cancel()
 	defer span.End()
 	
 	// decode payload		
 	payment := model.Payment{}
 	err := json.NewDecoder(req.Body).Decode(&payment)
-    if err != nil {
-		trace_id := fmt.Sprintf("%v",ctx.Value("request-id"))
-		return h.ErrorHandler(trace_id, erro.ErrBadRequest)
-    }
 	defer req.Body.Close()
+    
+	if err != nil {
+		return h.ErrorHandler(h.getTraceID(ctx), erro.ErrBadRequest)
+    }
 
 	res, err := h.workerService.AddPayment(ctx, &payment)
 	if err != nil {
-		trace_id := fmt.Sprintf("%v",ctx.Value("request-id"))
-		return h.ErrorHandler(trace_id, err)
+		return h.ErrorHandler(h.getTraceID(ctx), err)
 	}
 	
-	return coreMiddleWareWriteJSON.WriteJSON(rw, http.StatusOK, res)
+	return h.writeJSON(rw, http.StatusCreated, res)
 }
 
 // About get payment
 func (h *HttpRouters) GetPayment(rw http.ResponseWriter, req *http.Request) error {
-	
-	// trace and log
-	ctx, cancel := context.WithTimeout(req.Context(), time.Duration(h.appServer.Server.CtxTimeout) * time.Second)
-    defer cancel()
-
-	h.logger.Info().
-			Ctx(ctx).
-			Str("func","GetPayment").Send()
-
-	ctx, span := tracerProvider.SpanCtx(ctx, "adapter.GetPayment", trace.SpanKindInternal)
+	ctx, cancel, span := h.withContext(req, "GetPayment")
+	defer cancel()
 	defer span.End()
 
 	// decode payload			
 	vars := mux.Vars(req)
-	varID := vars["id"]
-
-	varIDint, err := strconv.Atoi(varID)
+	PaymentID, err := h.parseIDParam(vars)
     if err != nil {
-		trace_id := fmt.Sprintf("%v",ctx.Value("request-id"))
-		return h.ErrorHandler(trace_id, erro.ErrBadRequest)
+		return h.ErrorHandler(h.getTraceID(ctx), err)
     }
 
-	payment := model.Payment{ID: varIDint}
+	payment := model.Payment{ID: PaymentID}
 
 	res, err := h.workerService.GetPayment(ctx, &payment)
 	if err != nil {
-		trace_id := fmt.Sprintf("%v",ctx.Value("request-id"))
-		return h.ErrorHandler(trace_id, err)
+		return h.ErrorHandler(h.getTraceID(ctx), err)
 	}
 	
-	return coreMiddleWareWriteJSON.WriteJSON(rw, http.StatusOK, res)
+	return h.writeJSON(rw, http.StatusOK, res)
 }
 
 // About get payment from order
 func (h *HttpRouters) GetPaymentFromOrder(rw http.ResponseWriter, req *http.Request) error {
-	
-	// trace and log
-	ctx, cancel := context.WithTimeout(req.Context(), time.Duration(h.appServer.Server.CtxTimeout) * time.Second)
-    defer cancel()
-	
-	h.logger.Info().
-			Ctx(ctx).
-			Str("func","GetPaymentFromOrder").Send()
-
-
-	ctx, span := tracerProvider.SpanCtx(ctx, "adapter.GetPaymentFromOrder", trace.SpanKindInternal)
+	ctx, cancel, span := h.withContext(req, "GetPaymentFromOrder")
+	defer cancel()
 	defer span.End()
 
 	// decode payload			
 	vars := mux.Vars(req)
-	varID := vars["id"]
-
-	varIDint, err := strconv.Atoi(varID)
+	OrderID, err := h.parseIDParam(vars)
     if err != nil {
-		trace_id := fmt.Sprintf("%v",ctx.Value("request-id"))
-		return h.ErrorHandler(trace_id, erro.ErrBadRequest)
+		return h.ErrorHandler(h.getTraceID(ctx), err)
     }
 
-	order := model.Order{ID: varIDint}
+	order := model.Order{ID: OrderID}
 
 	res, err := h.workerService.GetPaymentFromOrder(ctx, &order)
 	if err != nil {
-		trace_id := fmt.Sprintf("%v",ctx.Value("request-id"))
-		return h.ErrorHandler(trace_id, err)
+		return h.ErrorHandler(h.getTraceID(ctx), err)
 	}
 	
-	return coreMiddleWareWriteJSON.WriteJSON(rw, http.StatusOK, res)
+	return h.writeJSON(rw, http.StatusOK, res)
 }
