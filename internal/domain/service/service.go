@@ -369,8 +369,6 @@ func(s *WorkerService) ProducerEventKafka(ctx context.Context,
 	ctx, span := s.tracerProvider.SpanCtx(ctx, "service.ProducerEventKafka", trace.SpanKindProducer)
 	defer span.End()
 
-	trace_id := fmt.Sprintf("%v",ctx.Value("request-id"))
-
 	// create a mutex to avoid commit over a transaction on air
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -410,13 +408,14 @@ func(s *WorkerService) ProducerEventKafka(ctx context.Context,
 	kafkaHeaders := []kafka.Header{}
 	appCarrier := KafkaHeaderCarrier{Headers: &kafkaHeaders}
 	otel.GetTextMapPropagator().Inject(ctx, appCarrier)
-	appCarrier.Set("request-id", trace_id)
+	requestID := go_core_midleware.GetRequestID(ctx)
+	appCarrier.Set("request-id", requestID)
 
-	s.logger.Printf("=========================================================")
+	s.logger.Info().Msg("=========================================================")
     for _, h := range kafkaHeaders {
-        s.logger.Printf("Header: %s = %s\n", h.Key, string(h.Value))
+        s.logger.Info().Msgf("Header: %s = %s\n", h.Key, string(h.Value))
     }
-	s.logger.Printf("=========================================================")
+	s.logger.Info().Msg("=========================================================")
 	
 	//--------------------------------------------------------
 	// publish event
@@ -473,7 +472,6 @@ func(s *WorkerService) ProducerEventKafka(ctx context.Context,
 // ----------------------------------------------
 // Helper kafka header OTEL
 // ----------------------------------------------
-
 type KafkaHeaderCarrier struct {
 	Headers *[]kafka.Header
 }

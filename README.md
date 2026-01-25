@@ -77,12 +77,22 @@ Add module (inside /cmd)
     KAFKA_PROTOCOL=SASL_SSL
     KAFKA_MECHANISM=SCRAM-SHA-512
     KAFKA_CLIENT_ID=GO-CLEARANCE-LOCAL
-    KAFKA_BROKER_1=b-1.mskarch01.x25pj7.c3.kafka.us-east-2.amazonaws.com:9096 
-    KAFKA_BROKER_2=b-3.mskarch01.x25pj7.c3.kafka.us-east-2.amazonaws.com:9096 
-    KAFKA_BROKER_3=b-2.mskarch01.x25pj7.c3.kafka.us-east-2.amazonaws.com:9096 
     KAFKA_PARTITION=3
     KAFKA_REPLICATION=1
     TOPIC_EVENT=topic.clearance.local
+
+    #KAFKA_PROTOCOL=SASL_SSL
+    #KAFKA_MECHANISM=SCRAM-SHA-512
+    #KAFKA_BROKER_1=b-1.mskarch01.x25pj7.c3.kafka.us-east-2.amazonaws.com:9096 
+    #KAFKA_BROKER_2=b-3.mskarch01.x25pj7.c3.kafka.us-east-2.amazonaws.com:9096 
+    #KAFKA_BROKER_3=b-2.mskarch01.x25pj7.c3.kafka.us-east-2.amazonaws.com:9096 
+
+    # Change from PLAINTEXT to SASL_PLAINTEXT to enable authentication
+    KAFKA_PROTOCOL=SASL_PLAINTEXT
+    KAFKA_MECHANISM=PLAIN
+    KAFKA_BROKER_1=localhost:9092
+    KAFKA_BROKER_2=localhost:9092
+    KAFKA_BROKER_3=localhost:9092
 
     NAME_SERVICE_00=go-order
     URL_SERVICE_00=http://localhost:7004
