@@ -27,16 +27,32 @@ import(
 	"go.opentelemetry.io/otel/attribute"
 )
 
-// metrics variables
-var(
-	tpsMetric 		metric.Int64Counter	
-	meter     		metric.Meter
-	latencyMetric  	metric.Float64Histogram
+// Route constants
+const (
+	routeHealth      = "/health"
+	routeLive        = "/live"
+	routeHeader      = "/header"
+	routeContext     = "/context"
+	routeInfo        = "/info"
+	routeMetrics     = "/metrics"
+	routePayment     = "/payment"
+	routePaymentOrder = "/payment/order"
 )
 
+// ExcludedFromTracing routes that should not create spans
+var ExcludedFromTracing = map[string]bool{
+	routeHealth:   true,
+	routeLive:     true,
+	routeHeader:   true,
+	routeContext:  true,
+	routeMetrics:  true,
+}
+
 type HttpAppServer struct {
-	appServer	*model.AppServer
-	logger		*zerolog.Logger
+	appServer		*model.AppServer
+	logger			*zerolog.Logger
+	tpsMetric		metric.Int64Counter
+	latencyMetric	metric.Float64Histogram
 }
 
 // About create new http server
@@ -57,84 +73,21 @@ func NewHttpAppServer(	appServer *model.AppServer,
 
 // About start http server
 func (h *HttpAppServer) StartHttpAppServer(	ctx context.Context, 
-											appHttpRouters app_http_routers.HttpRouters,
-											) {
+											appHttpRouters app_http_routers.HttpRouters) {
 	h.logger.Info().
+			Ctx(ctx).
 			Str("func","StartHttpAppServer").Send()
 
-	// ------------------------------
+	// Setup metrics if enabled
 	if h.appServer.Application.OtelTraces {
-		appInfoMetric := go_core_otel_metric.InfoMetric{Name: h.appServer.Application.Name,
-														Version: h.appServer.Application.Version,
-													}
-
-		metricProvider, err := go_core_otel_metric.NewMeterProvider(ctx, 
-																	appInfoMetric, 
-																	h.logger)
-		if err != nil {
-			h.logger.Warn().
-					Ctx(ctx).
-					Err(err).
-					Msg("error create a MetricProvider WARNING")
-		}
-		otel.SetMeterProvider(metricProvider)
-
-		meter = metricProvider.Meter(h.appServer.Application.Name )
-
-		tpsMetric, err = meter.Int64Counter("transaction_request_custom")
-		if err != nil {
-			h.logger.Warn().
-				Ctx(ctx).
-				Err(err).
-				Msg("error create a TPS METRIC WARNING")
-		}
-
-		latencyMetric, err = meter.Float64Histogram("latency_request_custom")
-			if err != nil {
-			h.logger.Warn().
-				Ctx(ctx).
-				Err(err).
-				Msg("error create a LATENCY METRIC WARNING")
+		if err := h.setupMetrics(ctx); err != nil {
+			h.logger.Warn().Ctx(ctx).Err(err).Msg("FAILED to setup metrics")
 		}
 	}
-   //----------------------------------------
 
-	appRouter := mux.NewRouter().StrictSlash(true)
-	// creata a middleware component
-	appMiddleWare := go_core_midleware.NewMiddleWare(h.logger)										
-					
-	appRouter.Use(appMiddleWare.MiddleWareHandlerHeader)
-	appRouter.Handle("/metrics", promhttp.Handler())
-
-	// setting routers
-	health := appRouter.Methods(http.MethodGet, http.MethodOptions).Subrouter()
-    health.HandleFunc("/health", appHttpRouters.Health)
-
-	live := appRouter.Methods(http.MethodGet, http.MethodOptions).Subrouter()
-    live.HandleFunc("/live", appHttpRouters.Live)
-
-	header := appRouter.Methods(http.MethodGet, http.MethodOptions).Subrouter()
-    header.HandleFunc("/header", appHttpRouters.Header)
-
-	wk_ctx := appRouter.Methods(http.MethodGet, http.MethodOptions).Subrouter()
-    wk_ctx.HandleFunc("/context", appHttpRouters.Context)
-
-	info := appRouter.Methods(http.MethodGet, http.MethodOptions).Subrouter()
-    info.HandleFunc("/info", appHttpRouters.Info)
-	info.Use(otelmux.Middleware(h.appServer.Application.Name))
-
-	add := appRouter.Methods(http.MethodPost, http.MethodOptions).Subrouter()
-	add.HandleFunc("/payment", appMiddleWare.MiddleWareErrorHandler(appHttpRouters.AddPayment))		
-	add.Use(otelmux.Middleware(h.appServer.Application.Name))
-
-	get := appRouter.Methods(http.MethodGet, http.MethodOptions).Subrouter()
-	get.HandleFunc("/payment/{id}",appMiddleWare.MiddleWareErrorHandler(appHttpRouters.GetPayment))		
-	get.Use(otelmux.Middleware(h.appServer.Application.Name))
-
-	getOrder := appRouter.Methods(http.MethodGet, http.MethodOptions).Subrouter()
-	getOrder.HandleFunc("/payment/order/{id}",appMiddleWare.MiddleWareErrorHandler(appHttpRouters.GetPaymentFromOrder))		
-	getOrder.Use(otelmux.Middleware(h.appServer.Application.Name))
-
+	// Setup routes and middleware
+	appRouter := h.setupRoutes(appHttpRouters)
+		
 	// -------   Server Http 
 	srv := http.Server{
 		Addr:         ":" +  strconv.Itoa(h.appServer.Server.Port),      	
@@ -147,15 +100,14 @@ func (h *HttpAppServer) StartHttpAppServer(	ctx context.Context,
 	h.logger.Info().
 			Ctx(ctx).
 			Str("Service Port", strconv.Itoa(h.appServer.Server.Port)).Send()
-	
-	// start server
+
+	// start server in goroutine
+	serverErrors := make(chan error, 1)
 	go func() {
 		err := srv.ListenAndServe()
-		if err != nil {
-			h.logger.Warn().
-					Ctx(ctx).
-					Err(err).
-					Msg("Canceling http mux server !!!")
+		if err != nil && err != http.ErrServerClosed {
+			h.logger.Error().Err(err).Msg("Server error")
+			serverErrors <- err
 		}
 	}()
 
@@ -164,41 +116,78 @@ func (h *HttpAppServer) StartHttpAppServer(	ctx context.Context,
 	signal.Notify(ch, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM)
 
 	for {
-		sig := <-ch
-
-		switch sig {
-		case syscall.SIGHUP:
-			h.logger.Info().
-					Ctx(ctx).
-					Msg("Received SIGHUP: Reloading Configuration...")
-		case syscall.SIGINT, syscall.SIGTERM:
-			h.logger.Info().
-					Ctx(ctx).
-					Msg("Received SIGINT/SIGTERM: Http Server Exit ...")
+		select {
+		case sig := <-ch:
+			switch sig {
+			case syscall.SIGHUP:
+				h.logger.Info().
+						Ctx(ctx).
+						Msg("Received SIGHUP: Reloading Configuration...")
+			case syscall.SIGINT, syscall.SIGTERM:
+				h.logger.Info().
+						Ctx(ctx).
+						Msg("Received SIGINT/SIGTERM: Http Server shutting down...")
+				
+				// Graceful shutdown with timeout
+				shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+				defer cancel()
+				
+				if err := srv.Shutdown(shutdownCtx); err != nil && err != http.ErrServerClosed {
+					h.logger.Error().
+							Ctx(ctx).
+							Err(err).
+							Msg("Error during shutdown")
+				}
+				return
+			default:
+				h.logger.Info().
+						Ctx(ctx).
+						Interface("Received signal", sig).Send()
+			}
+		case err := <-serverErrors:
+			h.logger.Error().Err(err).Msg("Server stopped unexpectedly")
 			return
-		default:
-			h.logger.Info().
-					Ctx(ctx).
-					Interface("Received signal:", sig).Send()
 		}
-	}
-
-	if err := srv.Shutdown(ctx); err != nil && err != http.ErrServerClosed {
-		h.logger.Warn().
-				Ctx(ctx).
-				Err(err).
-				Msg("Dirty shutdown WARNING !!!")
-		return
 	}
 }
 
-func middlewareMetric(next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+// Helper function to setup metrics
+func (h *HttpAppServer) setupMetrics(ctx context.Context) error {
+	appInfoMetric := go_core_otel_metric.InfoMetric{
+		Name:    h.appServer.Application.Name,
+		Version: h.appServer.Application.Version,
+	}
 
-		if tpsMetric != nil && latencyMetric != nil {
+	metricProvider, err := go_core_otel_metric.NewMeterProvider(ctx, appInfoMetric, h.logger)
+	if err != nil {
+		return err
+	}
+	
+	otel.SetMeterProvider(metricProvider)
+	meter := metricProvider.Meter(h.appServer.Application.Name)
+
+	tpsMetric, err := meter.Int64Counter("transaction_request_custom")
+	if err != nil {
+		return err
+	}
+	h.tpsMetric = tpsMetric
+
+	latencyMetric, err := meter.Float64Histogram("latency_request_custom")
+	if err != nil {
+		return err
+	}
+	h.latencyMetric = latencyMetric
+
+	return nil
+}
+
+// Helper function to wrap handler with metrics
+func (h *HttpAppServer) withMetrics(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if h.tpsMetric != nil && h.latencyMetric != nil {
 			start := time.Now()
 
-			tpsMetric.Add(r.Context(), 1,
+			h.tpsMetric.Add(r.Context(), 1,
 				metric.WithAttributes(
 					attribute.String("method", r.Method),
 					attribute.String("path", r.URL.Path),
@@ -208,7 +197,7 @@ func middlewareMetric(next http.HandlerFunc) http.HandlerFunc {
 			next(w, r)
 
 			duration := time.Since(start).Seconds()
-			latencyMetric.Record(r.Context(), duration,
+			h.latencyMetric.Record(r.Context(), duration,
 				metric.WithAttributes(
 					attribute.String("method", r.Method),
 					attribute.String("path", r.URL.Path),
@@ -218,4 +207,51 @@ func middlewareMetric(next http.HandlerFunc) http.HandlerFunc {
 			next(w, r)
 		}
 	}
+}
+
+// Helper function to setup routes and middleware
+func (h *HttpAppServer) setupRoutes(appHttpRouters app_http_routers.HttpRouters) *mux.Router {
+	appRouter := mux.NewRouter().StrictSlash(true)
+	appMiddleWare := go_core_midleware.NewMiddleWare(h.logger)
+	
+	// Apply common middleware
+	appRouter.Use(appMiddleWare.MiddleWareHandlerHeader)
+
+	// Register metrics handler before OTEL middleware
+	appRouter.Handle("/metrics", promhttp.Handler())
+
+	// Apply OTEL middleware with filter to exclude certain endpoints
+	appRouter.Use(otelmux.Middleware(h.appServer.Application.Name, 
+		otelmux.WithFilter(func(req *http.Request) bool {
+			_, excluded := ExcludedFromTracing[req.URL.Path]
+			return !excluded
+		})))
+	
+	// Register health check endpoints
+	health := appRouter.Methods(http.MethodGet, http.MethodOptions).Subrouter()
+	health.HandleFunc(routeHealth, appHttpRouters.Health)
+
+	live := appRouter.Methods(http.MethodGet, http.MethodOptions).Subrouter()
+	live.HandleFunc(routeLive, appHttpRouters.Live)
+
+	header := appRouter.Methods(http.MethodGet, http.MethodOptions).Subrouter()
+	header.HandleFunc(routeHeader, appHttpRouters.Header)
+
+	wk_ctx := appRouter.Methods(http.MethodGet, http.MethodOptions).Subrouter()
+	wk_ctx.HandleFunc(routeContext, appHttpRouters.Context)
+
+	info := appRouter.Methods(http.MethodGet, http.MethodOptions).Subrouter()
+	info.HandleFunc(routeInfo, appHttpRouters.Info)
+
+	// Register business logic routes with metrics middleware
+	add := appRouter.Methods(http.MethodPost, http.MethodOptions).Subrouter()
+	add.HandleFunc(routePayment, h.withMetrics(appMiddleWare.MiddleWareErrorHandler(appHttpRouters.AddPayment)))
+
+	get := appRouter.Methods(http.MethodGet, http.MethodOptions).Subrouter()
+	get.HandleFunc(routePayment+"/{id}", h.withMetrics(appMiddleWare.MiddleWareErrorHandler(appHttpRouters.GetPayment)))
+
+	get_payment_order := appRouter.Methods(http.MethodGet, http.MethodOptions).Subrouter()
+	get_payment_order.HandleFunc(routePaymentOrder+"/{id}", h.withMetrics(appMiddleWare.MiddleWareErrorHandler(appHttpRouters.GetPaymentFromOrder)))
+
+	return appRouter
 }

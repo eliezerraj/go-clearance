@@ -17,5 +17,5 @@ var (
 	ErrServer		 	= errors.New("server identified error")
 	ErrHTTPForbiden		= errors.New("forbiden request")
 	ErrTimeout			= errors.New("timeout: context deadline exceeded")
-	ErrHealthCheck		= errors.New("health check services required failed")
+	ErrHealthCheck		= errors.New("health check services required FAILED")
 )
