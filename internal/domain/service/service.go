@@ -19,7 +19,7 @@ import (
 	go_core_http 		"github.com/eliezerraj/go-core/v2/http"
 	go_core_db_pg 		"github.com/eliezerraj/go-core/v2/database/postgre"
 	go_core_otel_trace 	"github.com/eliezerraj/go-core/v2/otel/trace"
-	go_core_midleware "github.com/eliezerraj/go-core/v2/middleware"
+	go_core_middleware "github.com/eliezerraj/go-core/v2/middleware"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/trace"
@@ -72,7 +72,7 @@ func (s *WorkerService) getServiceEndpoint(index int) (*model.Endpoint, error) {
 
 // Helper: Build HTTP headers with request ID
 func (s *WorkerService) buildHeaders(ctx context.Context) map[string]string {
-	requestID := go_core_midleware.GetRequestID(ctx)
+	requestID := go_core_middleware.GetRequestID(ctx)
 	return map[string]string{
 		"Content-Type":  "application/json;charset=UTF-8",
 		"X-Request-Id":  requestID,
@@ -409,12 +409,12 @@ func(s *WorkerService) ProducerEventKafka(ctx context.Context,
 	appCarrier := KafkaHeaderCarrier{Headers: &kafkaHeaders}
 	otel.GetTextMapPropagator().Inject(ctx, appCarrier)
 
-	requestID := go_core_midleware.GetRequestID(ctx)
+	requestID := go_core_middleware.GetRequestID(ctx)
 	if requestID == "" {
 		requestID = "not-found:from-service"
 	}
 
-	appCarrier.Set(string(go_core_midleware.RequestIDKey), requestID)
+	appCarrier.Set(string(go_core_middleware.RequestIDKey), requestID)
 
 	s.logger.Info().Msg("============== KAFKA HEADER ========================")
     for _, h := range kafkaHeaders {
