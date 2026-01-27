@@ -12,7 +12,8 @@ import (
 	"github.com/go-clearance/shared/erro"
 	"github.com/go-clearance/internal/domain/model"
 	"go.opentelemetry.io/otel/trace"
-
+	"go.opentelemetry.io/otel/codes"
+	
 	go_core_otel_trace "github.com/eliezerraj/go-core/v2/otel/trace"
 	go_core_db_pg "github.com/eliezerraj/go-core/v2/database/postgre"
 )
@@ -128,9 +129,11 @@ func (w* WorkerRepository) AddPayment(	ctx context.Context,
 						payment.CreatedAt)
 						
 	if err := row.Scan(&id); err != nil {
+		span.RecordError(err) 
+		span.SetStatus(codes.Error, err.Error())
 		w.logger.Error().
-				Ctx(ctx).
-				Err(err).Send()
+			Ctx(ctx).
+			Err(err).Send()
 		return nil, fmt.Errorf("FAILED to scan clearance ID: %w", err)
 	}
 
@@ -154,9 +157,11 @@ func (w *WorkerRepository) GetPayment(	ctx context.Context,
 	// db connection
 	conn, err := w.DatabasePG.Acquire(ctx)
 	if err != nil {
+		span.RecordError(err) 
+		span.SetStatus(codes.Error, err.Error())
 		w.logger.Error().
-				Ctx(ctx).
-				Err(err).Send()
+			Ctx(ctx).
+			Err(err).Send()
 		return nil, fmt.Errorf("FAILED to acquire database connection: %w", err)
 	}
 	defer w.DatabasePG.Release(conn)
@@ -178,17 +183,21 @@ func (w *WorkerRepository) GetPayment(	ctx context.Context,
 						query, 
 						payment.ID)
 	if err != nil {
+		span.RecordError(err) 
+		span.SetStatus(codes.Error, err.Error())
 		w.logger.Error().
-				Ctx(ctx).
-				Err(err).Send()
+			Ctx(ctx).
+			Err(err).Send()
 		return nil, fmt.Errorf("FAILED to query clearance: %w", err)
 	}
 	defer rows.Close()
 	
     if err := rows.Err(); err != nil {
+		span.RecordError(err) 
+		span.SetStatus(codes.Error, err.Error())
 		w.logger.Error().
-				Ctx(ctx).
-				Err(err).Msg("error iterating payment rows")
+			Ctx(ctx).
+			Err(err).Msg("error iterating payment rows")
         return nil, fmt.Errorf("error iterating payment rows: %w", err)
     }
 
@@ -197,9 +206,11 @@ func (w *WorkerRepository) GetPayment(	ctx context.Context,
 	for rows.Next() {
 		payment, err := w.scanPaymentFromRow(rows)
 		if err != nil {
+			span.RecordError(err) 
+			span.SetStatus(codes.Error, err.Error())
 			w.logger.Error().
-					Ctx(ctx).
-					Err(err).Send()
+				Ctx(ctx).
+				Err(err).Send()
 			return nil, err
         }
 		resPayment = payment
@@ -207,9 +218,9 @@ func (w *WorkerRepository) GetPayment(	ctx context.Context,
 
 	if resPayment == nil || resPayment.ID == 0 {
 		w.logger.Warn().
-				Ctx(ctx).
-				Err(erro.ErrNotFound).
-				Interface("payment.ID",payment.ID).Send()
+			Ctx(ctx).
+			Err(erro.ErrNotFound).
+			Interface("payment.ID",payment.ID).Send()
 		return nil, erro.ErrNotFound
 	}
 		
@@ -230,9 +241,11 @@ func (w *WorkerRepository) GetPaymentFromOrder(	ctx context.Context,
 	// db connection
 	conn, err := w.DatabasePG.Acquire(ctx)
 	if err != nil {
+		span.RecordError(err) 
+		span.SetStatus(codes.Error, err.Error())
 		w.logger.Error().
-				Ctx(ctx).
-				Err(err).Send()
+			Ctx(ctx).
+			Err(err).Send()
 		return nil, fmt.Errorf("FAILED to acquire database connection: %w", err)
 	}
 	defer w.DatabasePG.Release(conn)
@@ -254,17 +267,21 @@ func (w *WorkerRepository) GetPaymentFromOrder(	ctx context.Context,
 						query, 
 						order.ID)
 	if err != nil {
+		span.RecordError(err) 
+		span.SetStatus(codes.Error, err.Error())
 		w.logger.Error().
-				Ctx(ctx).
-				Err(err).Send()
+			Ctx(ctx).
+			Err(err).Send()
 		return nil, fmt.Errorf("FAILED to query clearance: %w", err)
 	}
 	defer rows.Close()
 	
     if err := rows.Err(); err != nil {
+		span.RecordError(err) 
+		span.SetStatus(codes.Error, err.Error())
 		w.logger.Error().
-				Ctx(ctx).
-				Err(err).Msg("error iterating payment rows")
+			Ctx(ctx).
+			Err(err).Msg("error iterating payment rows")
         return nil, fmt.Errorf("error iterating payment rows: %w", err)
     }
 
@@ -273,9 +290,11 @@ func (w *WorkerRepository) GetPaymentFromOrder(	ctx context.Context,
 	for rows.Next() {
 		payment, err := w.scanPaymentFromRow(rows)
 		if err != nil {
+			span.RecordError(err) 
+			span.SetStatus(codes.Error, err.Error())
 			w.logger.Error().
-					Ctx(ctx).
-					Err(err).Send()
+				Ctx(ctx).
+				Err(err).Send()
 			return nil, err
         }
 
