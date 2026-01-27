@@ -39,7 +39,7 @@ data:
   KAFKA_BROKER_3: "b-2.mskarch01.x25pj7.c3.kafka.us-east-2.amazonaws.com:9096" 
   KAFKA_PARTITION: "3"
   KAFKA_REPLICATION: "1"
-  TOPIC_EVENT: "topic.clearance.01"
+  TOPIC_EVENT_00: "topic.clearance.01"
 
   NAME_SERVICE_00: "go-order"
   URL_SERVICE_00: "http://go-order.architecture.caradhras.io"

@@ -17,7 +17,8 @@ import (
 	"github.com/go-clearance/internal/domain/model"
 	"github.com/go-clearance/internal/domain/service"
 	"go.opentelemetry.io/otel/trace"
-	
+	"go.opentelemetry.io/otel/codes"
+
 	go_core_midleware "github.com/eliezerraj/go-core/v2/middleware"
 	go_core_otel_trace "github.com/eliezerraj/go-core/v2/otel/trace"
 )
@@ -62,7 +63,7 @@ func NewHttpRouters(appServer *model.AppServer,
 						Logger()
 			
 	logger.Info().
-			Str("func","NewHttpRouters").Send()
+		Str("func","NewHttpRouters").Send()
 
 	return HttpRouters{
 		workerService: workerService,
@@ -106,6 +107,10 @@ func (h *HttpRouters) ErrorHandler(traceID string, err error) *go_core_midleware
 		httpStatusCode = http.StatusNotFound
 	}
 
+	if strings.Contains(err.Error(), "payment amount must be greater than zero") {
+		httpStatusCode = http.StatusBadRequest
+	}
+
 	if strings.Contains(err.Error(), "duplicate key") || 
 	   strings.Contains(err.Error(), "unique constraint") {
 		httpStatusCode = http.StatusBadRequest
@@ -133,7 +138,7 @@ func (h *HttpRouters) Live(rw http.ResponseWriter, req *http.Request) {
 // About show all header received
 func (h *HttpRouters) Header(rw http.ResponseWriter, req *http.Request) {
 	h.logger.Info().
-			Str("func","Header").Send()
+		Str("func","Header").Send()
 	
 	json.NewEncoder(rw).Encode(req.Header)
 }
@@ -141,7 +146,7 @@ func (h *HttpRouters) Header(rw http.ResponseWriter, req *http.Request) {
 // About show all context values
 func (h *HttpRouters) Context(rw http.ResponseWriter, req *http.Request) {
 	h.logger.Info().
-			Str("func","Context").Send()
+		Str("func","Context").Send()
 	
 	contextValues := reflect.ValueOf(req.Context()).Elem()
 
@@ -172,6 +177,8 @@ func (h *HttpRouters) AddPayment(rw http.ResponseWriter, req *http.Request) erro
 	defer req.Body.Close()
     
 	if err != nil {
+		span.RecordError(err) 
+		span.SetStatus(codes.Error, err.Error())
 		return h.ErrorHandler(h.getTraceID(ctx), erro.ErrBadRequest)
     }
 
@@ -193,6 +200,8 @@ func (h *HttpRouters) GetPayment(rw http.ResponseWriter, req *http.Request) erro
 	vars := mux.Vars(req)
 	PaymentID, err := h.parseIDParam(vars)
     if err != nil {
+		span.RecordError(err) 
+		span.SetStatus(codes.Error, err.Error())
 		return h.ErrorHandler(h.getTraceID(ctx), err)
     }
 
@@ -216,6 +225,8 @@ func (h *HttpRouters) GetPaymentFromOrder(rw http.ResponseWriter, req *http.Requ
 	vars := mux.Vars(req)
 	OrderID, err := h.parseIDParam(vars)
     if err != nil {
+		span.RecordError(err) 
+		span.SetStatus(codes.Error, err.Error())
 		return h.ErrorHandler(h.getTraceID(ctx), err)
     }
 

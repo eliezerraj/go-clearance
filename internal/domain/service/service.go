@@ -23,7 +23,8 @@ import (
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/trace"
-	
+	"go.opentelemetry.io/otel/codes"
+
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 )
 
@@ -162,15 +163,17 @@ func (s * WorkerService) HealthCheck(ctx context.Context) error {
 	spanDB.End()
 
 	if err != nil {
+		span.RecordError(err) 
+		span.SetStatus(codes.Error, err.Error())
 		s.logger.Error().
-				Ctx(ctx).
-				Err(err).Msg("*** Database HEALTH CHECK FAILED ***")
+			Ctx(ctx).
+			Err(err).Msg("*** Database HEALTH CHECK FAILED ***")
 		return erro.ErrHealthCheck
 	}
 
 	s.logger.Info().
-			Ctx(ctx).
-			Msg("*** Database HEALTH CHECK SUCCESSFULL ***")
+		Ctx(ctx).
+		Msg("*** Database HEALTH CHECK SUCCESSFULL ***")
 
 	return nil
 }
@@ -204,6 +207,8 @@ func (s *WorkerService) AddPayment(ctx context.Context,
 	// prepare database
 	tx, conn, err := s.workerRepository.DatabasePG.StartTx(ctx)
 	if err != nil {
+		span.RecordError(err) 
+		span.SetStatus(codes.Error, err.Error())
 		s.logger.Error().
 			Ctx(ctx).
 			Err(err).Send()
@@ -223,6 +228,8 @@ func (s *WorkerService) AddPayment(ctx context.Context,
 
 	endpoint, err := s.getServiceEndpoint(0)
 	if err != nil {
+		span.RecordError(err) 
+		span.SetStatus(codes.Error, err.Error())
 		return nil, err
 	}
 
@@ -237,52 +244,31 @@ func (s *WorkerService) AddPayment(ctx context.Context,
 	// call a service via http
 	resPayload, err := s.doHttpCall(ctx, httpClientParameter)
 	if err != nil {
+		span.RecordError(err) 
+		span.SetStatus(codes.Error, err.Error())
 		return nil, err
 	}
 
 	order, err := s.parseOrderFromPayload(ctx, resPayload)
 	if err != nil {
+		span.RecordError(err) 
+		span.SetStatus(codes.Error, err.Error())
 		return nil, err
 	}
-
-	// get order details
-	// prepare headers http for calling services
-	/*trace_id := fmt.Sprintf("%v",ctx.Value("request-id"))
-
-	headers := map[string]string{
-		"Content-Type":  "application/json;charset=UTF-8",
-		"X-Request-Id": trace_id,
-	}
-
-	httpClientParameter := go_core_http.HttpClientParameter {
-		Url:	fmt.Sprintf("%s%s%v", (*s.appServer.Endpoint)[0].Url , "/order/" , payment.Order.ID ),
-		Method:	"GET",
-		Timeout: (*s.appServer.Endpoint)[0].HttpTimeout,
-		Headers: &headers,
-	}
-
-	// call a service via http
-	resPayload, err := s.doHttpCall(ctx, 
-									httpClientParameter)
-	if err != nil {
-		return nil, err
-	}
-
-	// convert json to struct
-	jsonString, err  := json.Marshal(resPayload)
-	if err != nil {
-		s.logger.Error().
-				Ctx(ctx).
-				Err(err).Send()
-		return nil, errors.New(err.Error())
-	}
-	order := model.Order{}
-	json.Unmarshal(jsonString, &order)*/
 
 	// prepare data
 	now := time.Now()
 	payment.CreatedAt = now
 	payment.Order = order
+
+	if payment.Amount <= 0 {
+		
+		err = fmt.Errorf("payment amount must be greater than zero")
+		span.RecordError(err) 
+		span.SetStatus(codes.Error, err.Error())
+
+		return nil, err
+	}
 
 	// Create payment
 	resPayment, err := s.workerRepository.AddPayment(ctx, tx, payment)
@@ -306,6 +292,8 @@ func (s *WorkerService) AddPayment(ctx context.Context,
 									payment.Transaction,
 									&event)
 		if err != nil {
+			span.RecordError(err) 
+			span.SetStatus(codes.Error, err.Error())
 			return nil, err
 		}
 		registerOrchestrationProcess("RECONCILIATION MSG KAFKA:OK", &listStepProcess)
@@ -321,8 +309,8 @@ func (s *WorkerService) AddPayment(ctx context.Context,
 func (s * WorkerService) GetPayment(ctx context.Context, 
 									payment *model.Payment) (*model.Payment, error){
 	s.logger.Info().
-			Ctx(ctx).
-			Str("func","GetPayment").Send()
+		Ctx(ctx).
+		Str("func","GetPayment").Send()
 
 	// trace and log
 	ctx, span := s.tracerProvider.SpanCtx(ctx, "service.GetPayment", trace.SpanKindServer)
@@ -341,8 +329,8 @@ func (s * WorkerService) GetPayment(ctx context.Context,
 func (s * WorkerService) GetPaymentFromOrder(ctx context.Context, 
 											order *model.Order) (*[]model.Payment, error){
 	s.logger.Info().
-			Ctx(ctx).
-			Str("func","GetPaymentFromOrder").Send()
+		Ctx(ctx).
+		Str("func","GetPaymentFromOrder").Send()
 
 	// trace and log
 	ctx, span := s.tracerProvider.SpanCtx(ctx, "service.GetPaymentFromOrder", trace.SpanKindServer)
@@ -362,8 +350,8 @@ func(s *WorkerService) ProducerEventKafka(ctx context.Context,
 										  key string, 
 										  event *model.Event) (err error) {
 	s.logger.Info().
-			Ctx(ctx).
-			Str("func","ProducerEventKafka").Send()
+		Ctx(ctx).
+		Str("func","ProducerEventKafka").Send()
 			
 	// trace and log
 	ctx, span := s.tracerProvider.SpanCtx(ctx, "service.ProducerEventKafka", trace.SpanKindProducer)
@@ -379,9 +367,11 @@ func(s *WorkerService) ProducerEventKafka(ctx context.Context,
 	// Create a transaction
 	err = s.workerEvent.ProducerWorker.BeginTransaction()
 	if err != nil {
+		span.RecordError(err) 
+		span.SetStatus(codes.Error, err.Error())
 		s.logger.Error().
-				Ctx(ctx).
-				Err(err).Msg("FAILED to kafka BeginTransaction")
+			Ctx(ctx).
+			Err(err).Msg("FAILED to kafka BeginTransaction")
 
 		// Create a new producer and start a transaction
 		/*err = s.workerEvent.DestroyWorkerEventProducerTx(ctx)
@@ -398,9 +388,11 @@ func(s *WorkerService) ProducerEventKafka(ctx context.Context,
 	// Prepare to event
 	payload_bytes, err := json.Marshal(event)
 	if err != nil {
+		span.RecordError(err) 
+		span.SetStatus(codes.Error, err.Error())
 		s.logger.Error().
-				Ctx(ctx).
-				Err(err).Send()
+			Ctx(ctx).
+			Err(err).Send()
 		return err
 	}
 
@@ -426,38 +418,48 @@ func(s *WorkerService) ProducerEventKafka(ctx context.Context,
 	// publish event
 	// ------------------------------------------------------
 	s.logger.Info().
-			Ctx(ctx).
-			Str("func","ProducerEventKafka").Msg("Producer MSG KAFKA")
+		Ctx(ctx).
+		Str("func","ProducerEventKafka").Msg("Producer MSG KAFKA")
 	err = s.workerEvent.ProducerWorker.Producer(s.workerEvent.Topics[0], 
 												key, 
 												kafkaHeaders,
 												payload_bytes)
 	if err != nil {
+		span.RecordError(err) 
+		span.SetStatus(codes.Error, err.Error())
+
 		s.logger.Error().
-				Ctx(ctx).
-				Err(err).Msg("KAFKA ROLLBACK !!!")
+			Ctx(ctx).
+			Err(err).Msg("KAFKA ROLLBACK !!!")
+
 		err_msk := s.workerEvent.ProducerWorker.AbortTransaction(ctx)
 		if err_msk != nil {
+			span.RecordError(err_msk) 
+			span.SetStatus(codes.Error, err_msk.Error())
 			s.logger.Error().
-					Ctx(ctx).
-					Err(err).Msg("FAILED to kafka AbortTransaction")
+				Ctx(ctx).
+				Err(err_msk).Msg("FAILED to kafka AbortTransaction")
 			return err_msk
 		}
 		return err
 	}
 
 	s.logger.Info().
-			Ctx(ctx).
-			Str("func","ProducerEventKafka").Msg("CommitTransaction")
+		Ctx(ctx).
+		Str("func","ProducerEventKafka").Msg("CommitTransaction")
 	err = s.workerEvent.ProducerWorker.CommitTransaction(ctx)
 	if err != nil {
+		span.RecordError(err) 
+		span.SetStatus(codes.Error, err.Error())
 		s.logger.Error().
-				Ctx(ctx).
-				Err(err).
-				Msg("FAILED to Kafka CommitTransaction = KAFKA ROLLBACK COMMIT !!!")
+			Ctx(ctx).
+			Err(err).
+			Msg("FAILED to Kafka CommitTransaction = KAFKA ROLLBACK COMMIT !!!")
 
 		errMskAbort := s.workerEvent.ProducerWorker.AbortTransaction(ctx)
 		if errMskAbort != nil {
+			span.RecordError(errMskAbort) 
+			span.SetStatus(codes.Error, errMskAbort.Error())
 			s.logger.Error().
 				Ctx(ctx).
 				Err(errMskAbort).
