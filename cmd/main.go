@@ -51,9 +51,10 @@ func init(){
 								os.O_APPEND|os.O_CREATE|os.O_WRONLY, 
 								0644)
 		if err != nil {
-			panic(fmt.Sprintf("FAILED to open log file: %v", err))
+			fmt.Fprintf(os.Stderr, "WARNING: failed to open log file '%s': %v\n", application.LogGroup, err)
+		} else {
+			writers = append(writers, file)
 		}
-		writers = append(writers, file)
 	} 
 	multiWriter := io.MultiWriter(writers...)
 

@@ -408,14 +408,19 @@ func(s *WorkerService) ProducerEventKafka(ctx context.Context,
 	kafkaHeaders := []kafka.Header{}
 	appCarrier := KafkaHeaderCarrier{Headers: &kafkaHeaders}
 	otel.GetTextMapPropagator().Inject(ctx, appCarrier)
-	requestID := go_core_midleware.GetRequestID(ctx)
-	appCarrier.Set("request-id", requestID)
 
-	s.logger.Info().Msg("=========================================================")
+	requestID := go_core_midleware.GetRequestID(ctx)
+	if requestID == "" {
+		requestID = "not-found:from-service"
+	}
+
+	appCarrier.Set(string(go_core_midleware.RequestIDKey), requestID)
+
+	s.logger.Info().Msg("============== KAFKA HEADER ========================")
     for _, h := range kafkaHeaders {
         s.logger.Info().Msgf("Header: %s = %s\n", h.Key, string(h.Value))
     }
-	s.logger.Info().Msg("=========================================================")
+	s.logger.Info().Msg("============== KAFKA HEADER ========================")
 	
 	//--------------------------------------------------------
 	// publish event
