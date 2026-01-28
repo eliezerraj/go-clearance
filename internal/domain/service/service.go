@@ -5,7 +5,6 @@ import (
 	"time"
 	"context"
 	"sync"
-	"net/http"
 	"encoding/json"
 
 	"github.com/rs/zerolog"
@@ -81,53 +80,65 @@ func (s *WorkerService) buildHeaders(ctx context.Context) map[string]string {
 }
 
 // about do http call 
-func (s *WorkerService) doHttpCall(ctx context.Context,
-									httpClientParameter go_core_http.HttpClientParameter) (interface{},error) {
-
+func (s *WorkerService) doHttpCall(ctx context.Context,	httpClientParameter go_core_http.HttpClientParameter) (interface{}, error) {
 	s.logger.Info().
 			 Ctx(ctx).
 			 Str("func","doHttpCall").Send()
 
-	resPayload, statusCode, err := s.httpService.DoHttp(ctx, 
-														httpClientParameter)
+	resPayload, statusCode, err := s.httpService.DoHttp(ctx, httpClientParameter)
+
 	if err != nil {
 		s.logger.Error().
-				Ctx(ctx).
-				Err(err).Send()
+			Ctx(ctx).
+			Err(err).Send()
 		return nil, err
 	}
-	if statusCode != http.StatusOK {
-		if statusCode == http.StatusNotFound {
-			s.logger.Warn().
-					 Ctx(ctx).
-					 Err(erro.ErrNotFound).Send()
-			return nil, erro.ErrNotFound
-		} else {		
-			jsonString, err := json.Marshal(resPayload)
-			if err != nil {
-				s.logger.Error().
-						Ctx(ctx).
-						Err(err).Send()
-				return nil, fmt.Errorf("FAILED to marshal http response: %w", err)
-			}			
-			
-			message := model.APIError{}
-			if err := json.Unmarshal(jsonString, &message); err != nil {
-				s.logger.Error().
-						Ctx(ctx).
-						Err(err).Send()
-				return nil, fmt.Errorf("FAILED to unmarshal error response: %w", err)
-			}
 
-			newErr := fmt.Errorf("http call error: status code %d - message: %s", statusCode, message.Msg)
-			s.logger.Error().
-					Ctx(ctx).
-					Err(newErr).Send()
-			return nil, newErr
+	s.logger.Debug().
+		Interface("+++++++++++++++++> httpClientParameter.Url:",httpClientParameter.Url).
+		Interface("+++++++++++++++++> resPayload:",resPayload).
+		Interface("+++++++++++++++++> statusCode:",statusCode).
+		Interface("+++++++++++++++++> err:", err).
+		Send()
+
+		switch (statusCode) {
+			case 200:
+				return resPayload, nil
+			case 201:
+				return resPayload, nil	
+			case 400:
+			case 401:
+			case 403:
+			case 404:
+			case 500:
+				return nil, fmt.Errorf("internal server error (status code %d) - (process: %s)", statusCode, httpClientParameter.Url)
+			default:
 		}
-	}
 
-	return resPayload, nil
+		// marshal response payload
+		jsonString, err := json.Marshal(resPayload)
+		if err != nil {
+			s.logger.Error().
+				Ctx(ctx).
+				Err(err).Send()
+			return nil, fmt.Errorf("FAILED to marshal http response: %w (process: %s)", err, httpClientParameter.Url)
+		}
+
+		// parse error message
+		message := model.APIError{}
+		if err := json.Unmarshal(jsonString, &message); err != nil {
+			s.logger.Error().
+				Ctx(ctx).
+				Err(err).Send()
+			return nil, fmt.Errorf("FAILED to unmarshal error response: %w (process: %s)", err, httpClientParameter.Url)
+		}
+
+		newErr := fmt.Errorf("%s - (status code %d) - (process: %s)", message.Msg,statusCode, httpClientParameter.Url)
+		s.logger.Error().
+			Ctx(ctx).
+			Err(newErr).Send()
+		
+	return nil, newErr
 }
 
 // register a new step proccess
@@ -262,7 +273,6 @@ func (s *WorkerService) AddPayment(ctx context.Context,
 	payment.Order = order
 
 	if payment.Amount <= 0 {
-		
 		err = fmt.Errorf("payment amount must be greater than zero")
 		span.RecordError(err) 
 		span.SetStatus(codes.Error, err.Error())

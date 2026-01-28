@@ -107,6 +107,14 @@ func (h *HttpRouters) ErrorHandler(traceID string, err error) *go_core_midleware
 		httpStatusCode = http.StatusNotFound
 	}
 
+	if strings.Contains(err.Error(), "status code 404") {
+		httpStatusCode = http.StatusNotFound
+	}
+
+	if strings.Contains(err.Error(), "status code 400") {
+		httpStatusCode = http.StatusBadRequest
+	}
+
 	if strings.Contains(err.Error(), "payment amount must be greater than zero") {
 		httpStatusCode = http.StatusBadRequest
 	}
