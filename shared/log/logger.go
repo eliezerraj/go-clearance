@@ -16,7 +16,7 @@ func (h TraceHook) Run(e *zerolog.Event, level zerolog.Level, msg string) {
 
     requestID := go_core_midleware.GetRequestID(ctx)
     if requestID != "" {
-        e = e.Str("request-id", requestID)
+        e = e.Str(string(go_core_midleware.RequestIDKey), requestID)
     } 
 
 	spanCtx := trace.SpanContextFromContext(ctx)
