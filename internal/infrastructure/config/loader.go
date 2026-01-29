@@ -189,10 +189,6 @@ func (cl *ConfigLoader) loadServer() (*model.Server, error) {
 func (cl *ConfigLoader) loadDatabase() (*go_core_db_pg.DatabaseConfig, error) {
 	cl.logger.Debug().Msg("Loading database configuration")
 
-	host := getEnvString("DB_HOST", "localhost")
-	port := getEnvString("DB_PORT", "5432")
-	dbName := getEnvString("DB_NAME", "postgres")
-
 	maxConn, err := getEnvInt("DB_MAX_CONNECTION", 10)
 	if err != nil {
 		return nil, fmt.Errorf("invalid DB_MAX_CONNECTION: %w", err)
@@ -205,9 +201,9 @@ func (cl *ConfigLoader) loadDatabase() (*go_core_db_pg.DatabaseConfig, error) {
 	}
 
 	dbCfg := &go_core_db_pg.DatabaseConfig{
-		Host:            host,
-		Port:            port,
-		DatabaseName:    dbName,
+		Host:            getEnvString("DB_HOST", "localhost"),
+		Port:            getEnvString("DB_PORT", "5432"),
+		DatabaseName:    getEnvString("DB_NAME", "postgres"),
 		User:            strings.TrimSpace(user),
 		Password:        strings.TrimSpace(pass),
 		DBMaxConnection: maxConn,
