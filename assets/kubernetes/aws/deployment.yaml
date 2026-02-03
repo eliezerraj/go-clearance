@@ -18,6 +18,7 @@ spec:
         app: *app-name
     spec:
       serviceAccountName: sa-go-clearance
+      enableServiceLinks: false
       volumes:
       - name: volume-secret
         secret:
