@@ -21,12 +21,12 @@ var	logger = zerolog.New(os.Stdout).
 // Load the Application configuration
 func GetApplicationInfo() (model.Application) {
 	logger.Info().
-			Str("func","GetApplicationInfo").Send()
+		Str("func","GetApplicationInfo").Send()
 
 	err := godotenv.Load(".env")
 	if err != nil {
-		logger.Info().
-					Err(err).Send()
+		logger.Warn().
+			Err(err).Send()
 	}
 
 	var application model.Application

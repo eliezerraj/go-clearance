@@ -44,7 +44,7 @@ func NewConfigLoader(logger *zerolog.Logger) *ConfigLoader {
 	envOnce.Do(func() {
 		err := godotenv.Load(".env")
 		if err != nil {
-			logger.Info().
+			logger.Warn().
 				Err(err).
 				Msg("No .env file found, using environment variables")
 		}
