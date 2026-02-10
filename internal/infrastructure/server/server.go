@@ -53,6 +53,7 @@ type HttpAppServer struct {
 	logger			*zerolog.Logger
 	tpsMetric		metric.Int64Counter
 	latencyMetric	metric.Float64Histogram
+	statusMetric    metric.Int64Counter
 }
 
 // About create new http server
@@ -166,47 +167,25 @@ func (h *HttpAppServer) setupMetrics(ctx context.Context) error {
 	otel.SetMeterProvider(metricProvider)
 	meter := metricProvider.Meter(h.appServer.Application.Name)
 
-	tpsMetric, err := meter.Int64Counter("transaction_request_custom")
+	tpsMetric, err := meter.Int64Counter("custom_tps_count")
 	if err != nil {
 		return err
 	}
 	h.tpsMetric = tpsMetric
 
-	latencyMetric, err := meter.Float64Histogram("latency_request_custom")
+	latencyMetric, err := meter.Float64Histogram("custom_latency_request")
 	if err != nil {
 		return err
 	}
 	h.latencyMetric = latencyMetric
 
+	statusMetric, err := meter.Int64Counter("custom_status_code_count")
+    if err != nil {
+        return err
+    }
+    h.statusMetric = statusMetric
+
 	return nil
-}
-
-// Helper function to wrap handler with metrics
-func (h *HttpAppServer) withMetrics(next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if h.tpsMetric != nil && h.latencyMetric != nil {
-			start := time.Now()
-
-			h.tpsMetric.Add(r.Context(), 1,
-				metric.WithAttributes(
-					attribute.String("method", r.Method),
-					attribute.String("path", r.URL.Path),
-				),
-			)
-
-			next(w, r)
-
-			duration := time.Since(start).Seconds()
-			h.latencyMetric.Record(r.Context(), duration,
-				metric.WithAttributes(
-					attribute.String("method", r.Method),
-					attribute.String("path", r.URL.Path),
-				),
-			)
-		} else {
-			next(w, r)
-		}
-	}
 }
 
 // Helper function to setup routes and middleware
@@ -254,4 +233,59 @@ func (h *HttpAppServer) setupRoutes(appHttpRouters app_http_routers.HttpRouters)
 	get_payment_order.HandleFunc(routePaymentOrder+"/{id}", h.withMetrics(appMiddleWare.MiddleWareErrorHandler(appHttpRouters.GetPaymentFromOrder)))
 
 	return appRouter
+}
+
+// Response recorder to capture status code
+type statusRecorder struct {
+    http.ResponseWriter
+    status int
+}
+        
+func (rec *statusRecorder) WriteHeader(code int) {
+    rec.status = code
+    rec.ResponseWriter.WriteHeader(code)
+}
+
+// Helper function to wrap handler with metrics
+func (h *HttpAppServer) withMetrics(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+
+		if h.tpsMetric != nil && h.latencyMetric != nil && h.statusMetric != nil {
+			start := time.Now()
+
+			h.tpsMetric.Add(r.Context(), 1,
+				metric.WithAttributes(
+					attribute.String("method", r.Method),
+					attribute.String("path", r.URL.Path),
+				),
+			)
+
+            rec := &statusRecorder{ResponseWriter: w}
+            next(rec, r)
+
+			duration := time.Since(start).Seconds()
+			h.latencyMetric.Record(r.Context(), duration,
+				metric.WithAttributes(
+					attribute.String("method", r.Method),
+					attribute.String("path", r.URL.Path),
+				),
+			)
+
+			status := rec.status
+            if status == 0 {
+                status = http.StatusOK
+            }
+
+            h.statusMetric.Add(r.Context(), 1,
+                metric.WithAttributes(
+                    attribute.Int("status_code", status),
+                    attribute.String("method", r.Method),
+                    attribute.String("path", r.URL.Path),
+                ),
+            )
+
+		} else {
+			next(w, r)
+		}
+	}
 }
