@@ -10,7 +10,7 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: go-clearance
-  minReplicas: 3
+  minReplicas: 1
   maxReplicas: 6
   metrics:
   - type: Resource
