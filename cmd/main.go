@@ -118,9 +118,11 @@ func setupAppContext(ctx context.Context) (*AppContext, error) {
 	// Connect to Kafka producer
 	workerEventProducer, err := connectKafkaProducer(ctx, *appServer.KafkaConfigurations, *appServer.Topics, &logger)
 	if err != nil {
-		//return nil, fmt.Errorf("Kafka producer connection FAILED: %w", err)
 		logger.Warn().
 			Msgf("Kafka producer connection FAILED: %s", err.Error())
+	} else {
+		logger.Info().
+			Msg("Kafka producer connection SUCCESSFUL !!!!!")
 	}
 
 	return &AppContext{
