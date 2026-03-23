@@ -237,6 +237,7 @@ func (s *WorkerService) AddPayment(ctx context.Context,
 		span.End()
 	}()
 
+	// call a service to get order information for given order id
 	endpoint, err := s.getServiceEndpoint(0)
 	if err != nil {
 		span.RecordError(err) 
