@@ -40,18 +40,15 @@ var initLogger zerolog.Logger
 
 // init sets up global logger for startup
 func init(){
-	// Load application info
-	application := config.GetApplicationInfo()
-	
 	// Log setup	
 	writers := []io.Writer{os.Stdout}
 
-	if application.StdOutLogGroup {
-		file, err := os.OpenFile(application.LogGroup, 
-								os.O_APPEND|os.O_CREATE|os.O_WRONLY, 
-								0644)
+	if os.Getenv("OTEL_STDOUT_LOG_GROUP") == "true" {
+		file, err := os.OpenFile(os.Getenv("LOG_GROUP"), 
+						os.O_APPEND|os.O_CREATE|os.O_WRONLY, 
+						0644)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "WARNING: failed to open log file '%s': %v\n", application.LogGroup, err)
+			fmt.Fprintf(os.Stderr, "WARNING: failed to open log file '%s': %v\n", os.Getenv("LOG_GROUP"), err)
 		} else {
 			writers = append(writers, file)
 		}
@@ -59,7 +56,7 @@ func init(){
 	multiWriter := io.MultiWriter(writers...)
 
 	// log level
-	switch application.LogLevel {
+	switch os.Getenv("LOG_LEVEL") {
 	case "debug":
 		zerolog.SetGlobalLevel(zerolog.DebugLevel)
 	case "warning": 
@@ -74,7 +71,7 @@ func init(){
 	initLogger = zerolog.New(multiWriter).
 						With().
 						Timestamp().
-						Str("component", application.Name).
+						Str("component", os.Getenv("APPLICATION_NAME")).
 						Logger().
 						Hook(log.TraceHook{}) // hook the app shared log
 }

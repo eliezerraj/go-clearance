@@ -123,16 +123,20 @@ func (cl *ConfigLoader) loadApplication() (*model.Application, error) {
 		OtelMetrics:   getEnvBool("OTEL_METRICS", false),
 	}
 
-	// Get IP address
-	ipAddr, err := getLocalIPAddress()
+	addrs, err := net.InterfaceAddrs()
 	if err != nil {
-		cl.logger.Warn().Err(err).Msg("FAILED to get local IP address")
-		app.IPAddress = "unknown"
-	} else {
-		app.IPAddress = ipAddr
+		cl.logger.Error().
+			Err(err).Msg("FAILED to get local IP address")
 	}
 
-	app.OsPid = fmt.Sprintf("%d", os.Getpid())
+	for _, a := range addrs {
+		if ipnet, ok := a.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+			if ipnet.IP.To4() != nil {
+				app.IPAddress = ipnet.IP.String()
+			}
+		}
+	}
+	app.OsPid = strconv.Itoa(os.Getpid())	
 
 	cl.logger.Info().
 		Interface("application", app).
@@ -428,23 +432,4 @@ func getDatabaseCredentials(logger *zerolog.Logger) (user, pass string, err erro
 	}
 
 	return user, pass, nil
-}
-
-// getLocalIPAddress retrieves the local non-loopback IP address
-func getLocalIPAddress() (string, error) {
-
-	addrs, err := net.InterfaceAddrs()
-	if err != nil {
-		return "", err
-	}
-
-	for _, addr := range addrs {
-		if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
-			if ipnet.IP.To4() != nil {
-				return ipnet.IP.String(), nil
-			}
-		}
-	}
-
-	return "", fmt.Errorf("no non-loopback IP address found")
 }
