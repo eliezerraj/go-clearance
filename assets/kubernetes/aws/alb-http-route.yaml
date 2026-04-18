@@ -23,3 +23,26 @@ spec:
       backendRefs:
         - name: svc-go-clearance
           port: 7003
+          namespace: test-a
+#    - matches:
+#      - path:
+#            type: PathPrefix
+#            value: /
+#        headers:
+#        - name: x-env
+#          value: aws
+#      backendRefs:
+#        - name: svc-go-clearance
+#          port: 7003
+#          namespace: test-a
+#    - matches:
+#      - path:
+#            type: PathPrefix
+#            value: /
+#        headers:
+#        - name: x-env
+#          value: azure
+#      backendRefs:
+#        - name: svc-go-clearance
+#          port: 7003
+#          namespace: wk-az

@@ -7,6 +7,7 @@ import(
 	"time"
 	"context"
 
+	"github.com/joho/godotenv"
 	"github.com/rs/zerolog"
 
 	"github.com/go-clearance/shared/log"
@@ -43,6 +44,12 @@ func init(){
 	// Log setup	
 	writers := []io.Writer{os.Stdout}
 
+	// Load .env variables (if any) - this is optional and can be replaced with other config management
+	err := godotenv.Load()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "WARNING: failed to load .env file: %v\n", err)
+	}
+
 	if os.Getenv("OTEL_STDOUT_LOG_GROUP") == "true" {
 		file, err := os.OpenFile(os.Getenv("LOG_GROUP"), 
 						os.O_APPEND|os.O_CREATE|os.O_WRONLY, 
@@ -71,7 +78,7 @@ func init(){
 	initLogger = zerolog.New(multiWriter).
 						With().
 						Timestamp().
-						Str("component", os.Getenv("APPLICATION_NAME")).
+						Str("component", os.Getenv("APP_NAME")).
 						Logger().
 						Hook(log.TraceHook{}) // hook the app shared log
 }
@@ -115,11 +122,9 @@ func setupAppContext(ctx context.Context) (*AppContext, error) {
 	// Connect to Kafka producer
 	workerEventProducer, err := connectKafkaProducer(ctx, *appServer.KafkaConfigurations, *appServer.Topics, &logger)
 	if err != nil {
+		//return nil, fmt.Errorf("Kafka producer connection FAILED: %w", err)
 		logger.Warn().
 			Msgf("Kafka producer connection FAILED: %s", err.Error())
-	} else {
-		logger.Info().
-			Msg("Kafka producer connection SUCCESSFUL !!!!!")
 	}
 
 	return &AppContext{
