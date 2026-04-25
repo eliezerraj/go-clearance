@@ -33,7 +33,7 @@ data:
   KAFKA_PASSWORD: "admin"
   KAFKA_PROTOCOL: "SASL_SSL"
   KAFKA_MECHANISM: "SCRAM-SHA-512"
-  KAFKA_CLIENT_ID: "GO-CLEARANCE-01"
+  KAFKA_CLIENT_ID: "GO-CLEARANCE-01-AWS-NS-WK-AZ"
   KAFKA_BROKER_1: "b-1.mskarch01.x25pj7.c3.kafka.us-east-2.amazonaws.com:9096" 
   KAFKA_BROKER_2: "b-3.mskarch01.x25pj7.c3.kafka.us-east-2.amazonaws.com:9096" 
   KAFKA_BROKER_3: "b-2.mskarch01.x25pj7.c3.kafka.us-east-2.amazonaws.com:9096" 

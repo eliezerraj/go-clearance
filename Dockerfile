@@ -1,7 +1,7 @@
 # docker build -t go-clearance .
 # docker run -dit --name go-clearance -p 7003:7003 go-clearance
 
-FROM golang:1.24 As builder
+FROM golang:1.24 AS builder
 
 RUN apt-get update && apt-get install bash && apt-get install -y --no-install-recommends ca-certificates
 

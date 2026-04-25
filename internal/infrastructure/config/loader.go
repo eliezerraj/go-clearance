@@ -353,7 +353,6 @@ func (cl *ConfigLoader) loadKafka() (*go_core_event.KafkaConfigurations, error) 
 		Protocol: getEnvString("KAFKA_PROTOCOL", "SASL_SSL"),
 		Mechanisms: getEnvString("KAFKA_MECHANISM", "SCRAM-SHA-512"),
 		Clientid: getEnvString("KAFKA_CLIENT_ID", "go-clearance-client"),
-		Groupid: getEnvString("KAFKA_GROUP_ID", "go-clearance-group"),	
 		Partition: partition,
 		ReplicationFactor: replicationFactor,
 		Brokers1: getEnvString("KAFKA_BROKER_1", "localhost:9092"),
