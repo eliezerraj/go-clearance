@@ -207,30 +207,20 @@ func (h *HttpAppServer) setupRoutes(appHttpRouters app_http_routers.HttpRouters)
 		})))
 	
 	// Register health check endpoints
-	health := appRouter.Methods(http.MethodGet, http.MethodOptions).Subrouter()
-	health.HandleFunc(routeHealth, appHttpRouters.Health)
-
-	live := appRouter.Methods(http.MethodGet, http.MethodOptions).Subrouter()
-	live.HandleFunc(routeLive, appHttpRouters.Live)
-
-	header := appRouter.Methods(http.MethodGet, http.MethodOptions).Subrouter()
-	header.HandleFunc(routeHeader, appHttpRouters.Header)
-
-	wk_ctx := appRouter.Methods(http.MethodGet, http.MethodOptions).Subrouter()
-	wk_ctx.HandleFunc(routeContext, appHttpRouters.Context)
-
-	info := appRouter.Methods(http.MethodGet, http.MethodOptions).Subrouter()
-	info.HandleFunc(routeInfo, appHttpRouters.Info)
+	getNoMetrics := appRouter.Methods(http.MethodGet, http.MethodOptions).Subrouter()
+	getNoMetrics.HandleFunc(routeHealth, appHttpRouters.Health)
+	getNoMetrics.HandleFunc(routeLive, appHttpRouters.Live)
+	getNoMetrics.HandleFunc(routeHeader, appHttpRouters.Header)
+	getNoMetrics.HandleFunc(routeContext, appHttpRouters.Context)
+	getNoMetrics.HandleFunc(routeInfo, appHttpRouters.Info)
 
 	// Register business logic routes with metrics middleware
-	add := appRouter.Methods(http.MethodPost, http.MethodOptions).Subrouter()
-	add.HandleFunc(routePayment, h.withMetrics(appMiddleWare.MiddleWareErrorHandler(appHttpRouters.AddPayment)))
+	post := appRouter.Methods(http.MethodPost, http.MethodOptions).Subrouter()
+	post.HandleFunc(routePayment, h.withMetrics(appMiddleWare.MiddleWareErrorHandler(appHttpRouters.AddPayment)))
 
 	get := appRouter.Methods(http.MethodGet, http.MethodOptions).Subrouter()
 	get.HandleFunc(routePayment+"/{id}", h.withMetrics(appMiddleWare.MiddleWareErrorHandler(appHttpRouters.GetPayment)))
-
-	get_payment_order := appRouter.Methods(http.MethodGet, http.MethodOptions).Subrouter()
-	get_payment_order.HandleFunc(routePaymentOrder+"/{id}", h.withMetrics(appMiddleWare.MiddleWareErrorHandler(appHttpRouters.GetPaymentFromOrder)))
+	get.HandleFunc(routePaymentOrder+"/{id}", h.withMetrics(appMiddleWare.MiddleWareErrorHandler(appHttpRouters.GetPaymentFromOrder)))
 
 	return appRouter
 }
